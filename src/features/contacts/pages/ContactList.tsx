@@ -40,7 +40,7 @@ export const ContactList = () => {
                 <tr 
                   key={c.id} 
                   style={{ borderBottom: '1px solid var(--color-border)', cursor: 'pointer' }}
-                  onClick={() => navigate(`/contacts/${c.id}`)}
+                  onClick={() => navigate(`/people/${c.id}`)}
                 >
                   <td className="body-text-important" style={{ padding: 'var(--space-4)' }}>{c.name}<br/><span className="body-text text-secondary">{c.title}</span></td>
                   <td style={{ padding: 'var(--space-4)' }}>{c.company}</td>

@@ -13,7 +13,7 @@ export const IdentifyPerson = () => {
 
   const confirmMutation = useMutation({
     mutationFn: () => contactsApi.confirmIdentify(id!),
-    onSuccess: () => navigate(`/contacts/${id}`)
+    onSuccess: () => navigate(`/people/${id}`)
   });
 
   if (isLoading) return <p>Loading identity data...</p>;

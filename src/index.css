@@ -74,6 +74,15 @@ button {
 .btn-secondary:hover:not(:disabled) {
   background-color: var(--color-bg-surface-hover);
 }
+.btn-danger {
+  background-color: #fff;
+  color: #DC2626;
+  border: 1px solid #FCA5A5;
+}
+.btn-danger:hover:not(:disabled) {
+  background-color: #FEF2F2;
+  border-color: #EF4444;
+}
 
 h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
 h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
@@ -87,4 +96,54 @@ h3 { font-size: 16px; font-weight: 600; margin: 0; }
   display: flex;
   min-height: 100vh;
   width: 100vw;
+}
+
+/* Markdown Styles */
+.markdown-body h1 {
+  font-size: 24px;
+  margin-top: 24px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
+}
+.markdown-body h2 {
+  font-size: 20px;
+  margin-top: 24px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 6px;
+}
+.markdown-body h3 {
+  font-size: 16px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.markdown-body p {
+  margin-bottom: 16px;
+  color: var(--color-text-secondary);
+}
+.markdown-body ul, .markdown-body ol {
+  margin-bottom: 16px;
+  padding-left: 24px;
+  color: var(--color-text-secondary);
+}
+.markdown-body li {
+  margin-bottom: 4px;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid var(--color-border);
+  padding: 8px 12px;
+  text-align: left;
+}
+.markdown-body th {
+  background-color: var(--color-bg-primary);
+  font-weight: 600;
+}
+.markdown-body strong {
+  color: var(--color-text-primary);
 }

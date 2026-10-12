@@ -6,7 +6,7 @@ interface WorkspaceShellProps {
   subtitle?: string;
   breadcrumbs?: { label: string; path: string }[];
   primaryAction?: { label: string; onClick: () => void; disabled?: boolean };
-  secondaryActions?: { label: string; onClick: () => void; disabled?: boolean; variant?: 'primary' | 'secondary' }[];
+  secondaryActions?: { label: string; onClick: () => void; disabled?: boolean; variant?: 'primary' | 'secondary' | 'danger' }[];
   isLoading?: boolean;
   isError?: boolean;
   isEmpty?: boolean;
@@ -60,7 +60,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
                 key={action.label}
                 onClick={action.onClick}
                 disabled={action.disabled}
-                className={`btn ${action.variant === 'primary' ? 'btn-primary' : 'btn-secondary'}`}
+                className={`btn ${action.variant === 'primary' ? 'btn-primary' : action.variant === 'danger' ? 'btn-danger' : 'btn-secondary'}`}
               >
                 {action.label}
               </button>

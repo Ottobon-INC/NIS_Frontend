@@ -100,37 +100,63 @@ export interface Contact360Data {
   primaryRole?: string;
   relationshipStrength?: string;
   recentSignal?: string;
+  full_markdown_report?: string;
+  commercialIntelligence?: {
+    provenanceStatus: string;
+    domainName: string;
+    provenDomainExpertise: string;
+    isDomainSme: string;
+    opportunityCategory: string;
+    broadBusinessProblem: string;
+    smallestSolvableProblem: string;
+    whyNow: string;
+    ottobonCapabilityMatch: string;
+    deliveryRiskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+    estimatedEffortHours: string;
+    costPricingEstimate: string;
+    proposedFirstEngagement: string;
+    relationshipPath: string;
+    pipelineStage: string;
+    nextActionStep: string;
+    sourcesUsed?: {
+      source_id: string;
+      reference: string;
+      status: string;
+    }[];
+  };
 }
 
 export const contactsApi = {
-  list: () => apiClient.get<ContactOverview[]>('/api/contacts'),
+  list: () => apiClient.get<ContactOverview[]>('/api/v1/contacts'),
   
   create: async (data: { linkedinUrl: string }) => {
-    // using fetch wrapper logic
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-    const response = await fetch(`${baseUrl}/api/contacts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+    // 1. Create the contact
+    const contact = await apiClient.post<{ id: string }>('/api/v1/contacts', {
+      linkedin_url: data.linkedinUrl
     });
-    if (!response.ok) throw new Error('Failed to create');
-    return response.json() as Promise<{ id: string, status: string }>;
+    
+    // 2. Trigger research for the contact
+    const researchRes = await apiClient.post<{ success: boolean, research_run_id: string }>(
+      `/api/v1/contacts/${contact.id}/research`,
+      {}
+    );
+    
+    return { id: researchRes.research_run_id, status: 'QUEUED' };
   },
 
-  getStatus: (id: string) => apiClient.get<{ id: string, status: string }>(`/api/contacts/${id}/status`),
+  getStatus: async (run_id: string) => {
+    // Map backend research run progress to frontend expectations
+    const res = await apiClient.get<{ status: string, progress: any }>(`/api/v1/research/runs/${run_id}`);
+    return { id: run_id, status: res.status };
+  },
   
-  getIdentify: (id: string) => apiClient.get<IdentifyData>(`/api/contacts/${id}/identify`),
+  getIdentify: (id: string) => apiClient.get<IdentifyData>(`/api/v1/contacts/${id}/identify`),
   
   confirmIdentify: async (id: string) => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-    const response = await fetch(`${baseUrl}/api/contacts/${id}/identify`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'CONFIRMED' })
-    });
-    if (!response.ok) throw new Error('Failed to confirm');
-    return response.json();
+    return apiClient.patch(`/api/v1/contacts/${id}/identify`, { status: 'CONFIRMED' });
   },
 
-  get360: (id: string) => apiClient.get<Contact360Data>(`/api/contacts/${id}/360`),
+  get360: (id: string) => apiClient.get<Contact360Data>(`/api/v1/contacts/${id}/360`),
+
+  delete: (id: string) => apiClient.delete<{ success: boolean; deleted_id?: string }>(`/api/v1/contacts/${id}`),
 };

@@ -1,15 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import ReactMarkdown from 'react-markdown';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useContact360 } from '../../../hooks/useContact360';
 import { TrustBadge } from '../../../components/intelligence/TrustBadge';
 import { useUIStore } from '../../../store/uiStore';
+import { contactsApi } from '../../../services/api/contacts.api';
 
 export const Contact360Workspace: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { openEvidenceDrawer } = useUIStore();
   const { data: contact, isLoading, isError } = useContact360(id || '');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!id || !contact) return;
+    if (window.confirm(`Are you sure you want to delete "${contact.name}"? This action cannot be undone.`)) {
+      try {
+        setIsDeleting(true);
+        await contactsApi.delete(id);
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+        navigate('/people');
+      } catch (err: any) {
+        alert(`Failed to delete contact: ${err.message || 'Unknown error'}`);
+        setIsDeleting(false);
+      }
+    }
+  };
 
   if (!id) return <div>Invalid Contact ID</div>;
 
@@ -19,12 +39,116 @@ export const Contact360Workspace: React.FC = () => {
       subtitle={contact ? `${contact.title} · ${contact.company}` : ''}
       breadcrumbs={[{ label: 'People', path: '/people' }, { label: contact?.name || 'Contact 360', path: `/people/${id}` }]}
       primaryAction={{ label: 'Prepare Meeting', onClick: () => navigate(`/meetings/${id}/brief`) }}
-      secondaryActions={[{ label: 'Executive Summary', onClick: () => navigate(`/people/${id}/transcript`), variant: 'primary' }]}
+      secondaryActions={[
+        { label: 'Executive Summary', onClick: () => navigate(`/people/${id}/transcript`), variant: 'primary' },
+        { label: isDeleting ? 'Deleting...' : 'Delete Contact', onClick: handleDelete, variant: 'danger', disabled: isDeleting }
+      ]}
       isLoading={isLoading}
       isError={isError}
       isEmpty={false}
     >
-      {contact && (
+      {contact && contact.full_markdown_report ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
+          {contact.commercialIntelligence && (
+            <div style={{
+              background: '#fff',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 'var(--space-6)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-4)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: contact.commercialIntelligence.provenanceStatus === 'VERIFIED CURRENT' ? '#ECFDF5' : '#FFFBEB',
+                    color: contact.commercialIntelligence.provenanceStatus === 'VERIFIED CURRENT' ? '#047857' : '#B45309',
+                    border: `1px solid ${contact.commercialIntelligence.provenanceStatus === 'VERIFIED CURRENT' ? '#A7F3D0' : '#FDE68A'}`
+                  }}>
+                    {contact.commercialIntelligence.provenanceStatus}
+                  </span>
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: 'var(--color-brand-primary)',
+                    background: '#EEF2FF',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-sm)'
+                  }}>
+                    {contact.commercialIntelligence.opportunityCategory || 'Commercial Opportunity'}
+                  </span>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: contact.commercialIntelligence.deliveryRiskLevel === 'LOW' ? '#059669' : contact.commercialIntelligence.deliveryRiskLevel === 'HIGH' ? '#DC2626' : '#D97706'
+                  }}>
+                    Delivery Risk: {contact.commercialIntelligence.deliveryRiskLevel || 'LOW'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Status:</span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#4F46E5', background: '#F5F3FF', padding: '3px 8px', borderRadius: '4px' }}>
+                    {contact.commercialIntelligence.pipelineStage || 'QUALIFIED'} (Awaiting Founder Outreach Approval)
+                  </span>
+                </div>
+              </div>
+
+              {contact.commercialIntelligence.smallestSolvableProblem && (
+                <div style={{
+                  padding: 'var(--space-4)',
+                  background: '#F8FAFC',
+                  borderRadius: 'var(--radius-sm)',
+                  borderLeft: '4px solid #4F46E5'
+                }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>
+                    Smallest Worthwhile Solvable Problem
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>
+                    {contact.commercialIntelligence.smallestSolvableProblem}
+                  </div>
+                </div>
+              )}
+
+              {contact.commercialIntelligence.sourcesUsed && contact.commercialIntelligence.sourcesUsed.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>
+                    Sources ({contact.commercialIntelligence.sourcesUsed.length}):
+                  </span>
+                  {contact.commercialIntelligence.sourcesUsed.map((src, i) => (
+                    <span key={i} style={{
+                      fontSize: '11px',
+                      background: '#F1F5F9',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      color: '#334155',
+                      maxWidth: '260px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }} title={src.reference}>
+                      <strong style={{ textTransform: 'capitalize' }}>{src.source_id.replace('_', ' ')}</strong>: {src.reference}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <section style={{ padding: 'var(--space-8)', background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', lineHeight: '1.6' }}>
+            <div className="markdown-body">
+              <ReactMarkdown>{contact.full_markdown_report}</ReactMarkdown>
+            </div>
+          </section>
+        </div>
+      ) : contact && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-7)' }}>
