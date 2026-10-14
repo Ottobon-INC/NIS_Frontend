@@ -1,15 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useContact360 } from '../../../hooks/useContact360';
 import { TrustBadge } from '../../../components/intelligence/TrustBadge';
 import { useUIStore } from '../../../store/uiStore';
+import { contactsApi } from '../../../services/api/contacts.api';
+import { SemanticProductMatchCard } from '../components/SemanticProductMatchCard';
 
 export const Contact360Workspace: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { openEvidenceDrawer } = useUIStore();
   const { data: contact, isLoading, isError } = useContact360(id || '');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!id || !contact) return;
+    if (window.confirm(`Are you sure you want to delete "${contact.name}"? This action cannot be undone.`)) {
+      try {
+        setIsDeleting(true);
+        await contactsApi.delete(id);
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+        queryClient.invalidateQueries({ queryKey: ['deleted-contacts'] });
+        navigate('/people');
+      } catch (err: any) {
+        alert(`Failed to delete contact: ${err.message || 'Unknown error'}`);
+        setIsDeleting(false);
+      }
+    }
+  };
 
   if (!id) return <div>Invalid Contact ID</div>;
 
@@ -19,14 +42,120 @@ export const Contact360Workspace: React.FC = () => {
       subtitle={contact ? `${contact.title} · ${contact.company}` : ''}
       breadcrumbs={[{ label: 'People', path: '/people' }, { label: contact?.name || 'Contact 360', path: `/people/${id}` }]}
       primaryAction={{ label: 'Prepare Meeting', onClick: () => navigate(`/meetings/${id}/brief`) }}
-      secondaryActions={[{ label: 'Executive Summary', onClick: () => navigate(`/people/${id}/transcript`), variant: 'primary' }]}
+      secondaryActions={[
+        { label: 'Executive Summary', onClick: () => navigate(`/people/${id}/transcript`), variant: 'primary' },
+        { label: isDeleting ? 'Deleting...' : 'Delete Contact', onClick: handleDelete, variant: 'danger', disabled: isDeleting }
+      ]}
       isLoading={isLoading}
       isError={isError}
       isEmpty={false}
     >
       {contact && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
-          
+          {/* 1. Commercial Intelligence Provenance Banner */}
+          {contact.commercialIntelligence && (
+            <div style={{
+              background: '#fff',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 'var(--space-6)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-4)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: contact.commercialIntelligence.provenanceStatus === 'VERIFIED CURRENT' ? '#ECFDF5' : '#FFFBEB',
+                    color: contact.commercialIntelligence.provenanceStatus === 'VERIFIED CURRENT' ? '#047857' : '#B45309',
+                    border: `1px solid ${contact.commercialIntelligence.provenanceStatus === 'VERIFIED CURRENT' ? '#A7F3D0' : '#FDE68A'}`
+                  }}>
+                    {contact.commercialIntelligence.provenanceStatus}
+                  </span>
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: 'var(--color-brand-primary)',
+                    background: '#EEF2FF',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-sm)'
+                  }}>
+                    {contact.commercialIntelligence.opportunityCategory || 'Commercial Opportunity'}
+                  </span>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: contact.commercialIntelligence.deliveryRiskLevel === 'LOW' ? '#059669' : contact.commercialIntelligence.deliveryRiskLevel === 'HIGH' ? '#DC2626' : '#D97706'
+                  }}>
+                    Delivery Risk: {contact.commercialIntelligence.deliveryRiskLevel || 'LOW'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Status:</span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#4F46E5', background: '#F5F3FF', padding: '3px 8px', borderRadius: '4px' }}>
+                    {contact.commercialIntelligence.pipelineStage || 'QUALIFIED'} (Awaiting Founder Outreach Approval)
+                  </span>
+                </div>
+              </div>
+
+              {contact.commercialIntelligence.smallestSolvableProblem && (
+                <div style={{
+                  padding: 'var(--space-4)',
+                  background: '#F8FAFC',
+                  borderRadius: 'var(--radius-sm)',
+                  borderLeft: '4px solid #4F46E5'
+                }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>
+                    Smallest Worthwhile Solvable Problem
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>
+                    {contact.commercialIntelligence.smallestSolvableProblem}
+                  </div>
+                </div>
+              )}
+
+              {contact.commercialIntelligence.sourcesUsed && contact.commercialIntelligence.sourcesUsed.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>
+                    Verified Channels ({contact.commercialIntelligence.sourcesUsed.length}):
+                  </span>
+                  {contact.commercialIntelligence.sourcesUsed.map((src, i) => (
+                    <span key={i} style={{
+                      fontSize: '11px',
+                      background: '#F1F5F9',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      color: '#334155',
+                      maxWidth: '260px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }} title={src.reference}>
+                      <strong style={{ textTransform: 'capitalize' }}>{src.source_id.replace('_', ' ')}</strong>: {src.reference}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 2. Semantic Product & Solution Matching Card */}
+          <SemanticProductMatchCard
+            contactId={contact?.id || id}
+            contactName={contact.name}
+            contactCompany={contact.company}
+            contactTitle={contact.title}
+            defaultProblem={contact.commercialIntelligence?.broadBusinessProblem || contact.commercialIntelligence?.smallestSolvableProblem || ''}
+          />
+
+          {/* 3. Person Intelligence & Company Intelligence */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-7)' }}>
             {/* Person Intelligence */}
             <section style={{ padding: 'var(--space-6)', background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
@@ -37,6 +166,26 @@ export const Contact360Workspace: React.FC = () => {
                     <span className="labels text-secondary">Background</span>
                     <p className="body-text" style={{ margin: 'var(--space-1) 0 0 0' }}>{contact.personIntelligence.background}</p>
                   </div>
+                  {contact.personIntelligence.expertise && contact.personIntelligence.expertise.length > 0 && (
+                    <div>
+                      <span className="labels text-secondary" style={{ display: 'block', marginBottom: '6px' }}>Core Technical Expertise</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {contact.personIntelligence.expertise.map((tag, i) => (
+                          <span key={i} style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            background: '#F1F5F9',
+                            color: '#334155',
+                            padding: '3px 9px',
+                            borderRadius: '12px',
+                            border: '1px solid #E2E8F0'
+                          }}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <span className="labels text-secondary">Decision Influence</span>
                     <p className="body-text" style={{ margin: 'var(--space-1) 0 0 0' }}>{contact.personIntelligence.decisionInfluence}</p>
@@ -67,6 +216,7 @@ export const Contact360Workspace: React.FC = () => {
             </section>
           </div>
 
+          {/* 4. How They Help Us & How We Help Them */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-7)' }}>
             {/* How They Help Us */}
             <section style={{ padding: 'var(--space-6)', background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
@@ -109,6 +259,7 @@ export const Contact360Workspace: React.FC = () => {
             </section>
           </div>
 
+          {/* 5. Signals & Relationship Engine */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-7)' }}>
             {/* Signals */}
             <section style={{ padding: 'var(--space-6)', background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
@@ -192,7 +343,7 @@ export const Contact360Workspace: React.FC = () => {
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginLeft: 'var(--space-2)', borderLeft: '2px solid var(--color-border)', paddingLeft: 'var(--space-3)' }}>
                                 <div style={{ fontSize: 'var(--font-size-sm)' }}>
                                   <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--space-2)' }}>Introduction:</span>
-                                  <span className="body-text-important">Alan Turing &rarr; Sarah Connor</span>
+                                  <span className="body-text-important">Founder &rarr; {contact.name}</span>
                                 </div>
                                 <div style={{ fontSize: 'var(--font-size-sm)' }}>
                                   <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--space-2)' }}>Conversations:</span>
@@ -232,7 +383,76 @@ export const Contact360Workspace: React.FC = () => {
               </section>
             </div>
           </div>
-          
+
+          {/* 6. Cumulative Intelligence (What We Knew Before & What We Learned) */}
+          {(contact.whatWeKnewBefore || contact.whatWeLearned) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-7)' }}>
+              {/* What We Knew Before */}
+              <section style={{ padding: 'var(--space-6)', background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                  <h2 className="section-title" style={{ margin: 0 }}>What We Knew Before</h2>
+                  <span className="labels text-secondary">Verified Baseline</span>
+                </div>
+                {contact.whatWeKnewBefore ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                    <div>
+                      <span className="labels text-secondary">Verified Person Background</span>
+                      <p className="body-text text-secondary" style={{ margin: 'var(--space-1) 0 0 0', fontStyle: 'italic' }}>
+                        "{contact.whatWeKnewBefore.personBackground}"
+                      </p>
+                    </div>
+                    <div>
+                      <span className="labels text-secondary">Company Operational Context</span>
+                      <p className="body-text text-secondary" style={{ margin: 'var(--space-1) 0 0 0', fontStyle: 'italic' }}>
+                        "{contact.whatWeKnewBefore.companyContext}"
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>No baseline data recorded.</p>
+                )}
+              </section>
+
+              {/* What We Learned */}
+              <section style={{ padding: 'var(--space-6)', background: '#F8FAFC', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                  <h2 className="section-title" style={{ margin: 0 }}>What We Learned</h2>
+                  <span className="labels" style={{ background: 'var(--color-brand-primary)', color: '#fff', padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-sm)' }}>
+                    Extracted Intelligence
+                  </span>
+                </div>
+                {contact.whatWeLearned ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                    {contact.whatWeLearned.insights && contact.whatWeLearned.insights.length > 0 && (
+                      <div>
+                        <span className="labels text-secondary" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>Key Strategic Insights</span>
+                        <ul style={{ margin: 0, paddingLeft: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                          {contact.whatWeLearned.insights.map((insight, idx) => (
+                            <li key={idx} className="body-text">{insight}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>No additional insights captured yet.</p>
+                )}
+              </section>
+            </div>
+          )}
+
+          {/* 7. Full Markdown Intelligence Dossier */}
+          {contact.full_markdown_report && (
+            <section style={{ padding: 'var(--space-8)', background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', lineHeight: '1.6' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>Full Commercial Opportunity Brief</h3>
+                <span style={{ fontSize: '12px', color: '#64748B' }}>Verified Snapshot</span>
+              </div>
+              <div className="markdown-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{contact.full_markdown_report}</ReactMarkdown>
+              </div>
+            </section>
+          )}
         </div>
       )}
     </WorkspaceShell>

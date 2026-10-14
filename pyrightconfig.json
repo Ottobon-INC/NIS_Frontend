@@ -1,0 +1,8 @@
+{
+  "include": [
+    "NIS_Backend"
+  ],
+  "extraPaths": [
+    "NIS_Backend"
+  ]
+}

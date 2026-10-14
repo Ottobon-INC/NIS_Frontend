@@ -8,12 +8,18 @@ export const IdentifyPerson = () => {
   
   const { data, isLoading } = useQuery({
     queryKey: ['identify', id],
-    queryFn: () => contactsApi.getIdentify(id!)
+    queryFn: () => contactsApi.getIdentify(id!),
+    refetchInterval: (query) => {
+      if (query.state.data && (query.state.data.title === 'Analyzing profile...' || query.state.data.company === 'Pending research')) {
+        return 2000;
+      }
+      return false;
+    }
   });
 
   const confirmMutation = useMutation({
     mutationFn: () => contactsApi.confirmIdentify(id!),
-    onSuccess: () => navigate(`/contacts/${id}`)
+    onSuccess: () => navigate(`/people/${id}`)
   });
 
   if (isLoading) return <p>Loading identity data...</p>;

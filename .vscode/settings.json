@@ -1,0 +1,8 @@
+{
+  "python.analysis.extraPaths": [
+    "./NIS_Backend"
+  ],
+  "python.autoComplete.extraPaths": [
+    "./NIS_Backend"
+  ]
+}
