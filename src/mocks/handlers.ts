@@ -57,6 +57,19 @@ export const handlers = [
   }),
 
   // Contacts mock
+  http.get(`${API_BASE}/api/contacts/deleted`, async () => {
+    return HttpResponse.json([
+      { id: 'del-1', name: 'John Doe' },
+      { id: 'del-2', name: 'Jane Smith' }
+    ]);
+  }),
+  http.get(`${API_BASE}/api/v1/contacts/deleted`, async () => {
+    return HttpResponse.json([
+      { id: 'del-1', name: 'John Doe' },
+      { id: 'del-2', name: 'Jane Smith' }
+    ]);
+  }),
+
   http.get(`${API_BASE}/api/contacts`, async () => {
     await delay(600);
     return HttpResponse.json([

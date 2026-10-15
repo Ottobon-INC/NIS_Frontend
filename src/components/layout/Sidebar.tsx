@@ -1,13 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, Target, Network, BookOpen } from 'lucide-react';
+import { Users, Target, Network, Package, UserX } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
 const navItems = [
   { path: '/people', label: 'People / Relationships', icon: Users },
   { path: '/opportunities', label: 'Opportunities', icon: Target },
   { path: '/network', label: 'Network Intelligence', icon: Network },
-  { path: '/capabilities', label: 'Capability Intelligence', icon: BookOpen },
+  { path: '/capabilities', label: 'Products & Capabilities', icon: Package },
+  { path: '/deleted-connections', label: 'Deleted Connection', icon: UserX },
 ];
 
 export const Sidebar: React.FC = () => {

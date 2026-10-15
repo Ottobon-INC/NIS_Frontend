@@ -20,6 +20,7 @@ import { NetworkMatchingWorkspace } from './features/network/pages/NetworkMatchi
 import { FounderIntroductionWorkspace } from './features/introductions/pages/FounderIntroductionWorkspace';
 import { PostIntroductionWorkspace } from './features/opportunities/pages/PostIntroductionWorkspace';
 import { CapabilityWorkspace } from './features/capabilities/pages/CapabilityWorkspace';
+import { DeletedConnectionsWorkspace } from './features/contacts/pages/DeletedConnectionsWorkspace';
 import { NetworkMatch } from './features/network/pages/NetworkMatch';
 import { NetworkMap } from './features/network/pages/NetworkMap';
 import { CrossClientIntel } from './features/network/pages/CrossClientIntel';
@@ -48,7 +49,9 @@ export const routes = [
   { path: '/opportunities/:id/introduction', element: <FounderIntroductionWorkspace /> },
   { path: '/opportunities/:id/post-introduction', element: <PostIntroductionWorkspace /> },
   { path: '/capabilities', element: <CapabilityWorkspace /> },
+  { path: '/products', element: <CapabilityWorkspace /> },
   { path: '/network', element: <NetworkMap /> },
+  { path: '/deleted-connections', element: <DeletedConnectionsWorkspace /> },
 
   // Legacy/Contextual Routes (Preserved for safe migration)
   { path: '/contacts', element: <ContactList /> },

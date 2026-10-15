@@ -37,6 +37,22 @@ export const apiClient = {
     return response.json();
   },
 
+  async put<T>(endpoint: string, body: any): Promise<T> {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer mock-admin-token'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, await response.text());
+    }
+    return response.json();
+  },
+
   async patch<T>(endpoint: string, body: any): Promise<T> {
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
     const response = await fetch(`${baseUrl}${endpoint}`, {

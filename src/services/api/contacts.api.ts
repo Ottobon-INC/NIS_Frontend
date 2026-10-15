@@ -5,7 +5,7 @@ export interface ContactOverview {
   name: string;
   title: string;
   company: string;
-  status: 'PROCESSING' | 'IDENTIFIED' | 'INTELLIGENCE_READY';
+  status: 'PROCESSING' | 'IDENTIFIED' | 'INTELLIGENCE_READY' | 'READY' | 'NEW' | 'RESEARCHING' | string;
   lastUpdated: string;
 }
 
@@ -158,5 +158,16 @@ export const contactsApi = {
 
   get360: (id: string) => apiClient.get<Contact360Data>(`/api/v1/contacts/${id}/360`),
 
-  delete: (id: string) => apiClient.delete<{ success: boolean; deleted_id?: string }>(`/api/v1/contacts/${id}`),
+  delete: (id: string) => apiClient.delete<{ success: boolean; deleted_id?: string; name?: string }>(`/api/v1/contacts/${id}`),
+
+  getDeleted: () => apiClient.get<DeletedContactItem[]>('/api/v1/contacts/deleted'),
+
+  restore: (id: string) => apiClient.post<{ success: boolean; restored_id: string; name: string }>(`/api/v1/contacts/${id}/restore`, {}),
 };
+
+export interface DeletedContactItem {
+  id: string;
+  name: string;
+  deleted_at?: string;
+}
+

@@ -16,6 +16,7 @@ export const PeopleWorkspace: React.FC = () => {
     mutationFn: (contactId: string) => contactsApi.delete(contactId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['deleted-contacts'] });
       setDeletingId(null);
     },
     onError: (err: any) => {
