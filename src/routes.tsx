@@ -1,78 +1,38 @@
-
-
-
-import { PeopleWorkspace } from './features/contacts/pages/PeopleWorkspace';
-import { Contact360Workspace } from './features/contacts/pages/Contact360Workspace';
-import { IntelligenceTranscriptWorkspace } from './features/contacts/pages/IntelligenceTranscriptWorkspace';
-import { ContactList } from './features/contacts/pages/ContactList';
-import { AddContact } from './features/contacts/pages/AddContact';
-import { IdentifyPerson } from './features/contacts/pages/IdentifyPerson';
-import { Contact360 } from './features/contacts/pages/Contact360';
-import { MeetingBriefWorkspace } from './features/meetings/pages/MeetingBriefWorkspace';
-import { MeetingCaptureWorkspace } from './features/meetings/pages/MeetingCaptureWorkspace';
-import { MeetingIntelligenceWorkspace } from './features/meetings/pages/MeetingIntelligenceWorkspace';
-import { TrustedContextWorkspace } from './features/meetings/pages/TrustedContextWorkspace';
-
-import { OpportunityWorkspace } from './features/opportunities/pages/OpportunityWorkspace';
-import { OpportunityDetailWorkspace } from './features/opportunities/pages/OpportunityDetailWorkspace';
-import { SolutionCapabilityMatchingWorkspace } from './features/opportunities/pages/SolutionCapabilityMatchingWorkspace';
-import { NetworkMatchingWorkspace } from './features/network/pages/NetworkMatchingWorkspace';
-import { FounderIntroductionWorkspace } from './features/introductions/pages/FounderIntroductionWorkspace';
-import { PostIntroductionWorkspace } from './features/opportunities/pages/PostIntroductionWorkspace';
-import { CapabilityWorkspace } from './features/capabilities/pages/CapabilityWorkspace';
-import { DeletedConnectionsWorkspace } from './features/contacts/pages/DeletedConnectionsWorkspace';
-import { NetworkMatch } from './features/network/pages/NetworkMatch';
-import { NetworkMap } from './features/network/pages/NetworkMap';
-import { CrossClientIntel } from './features/network/pages/CrossClientIntel';
-import { EcosystemEvents } from './features/network/pages/EcosystemEvents';
-import { MessageReview } from './features/introductions/pages/MessageReview';
-
-// Legacy Dashboard removed, replaced by FounderCockpit
+import { Navigate } from 'react-router-dom';
+import type { RouteObject } from 'react-router-dom';
+import { contactRoutes } from './features/contacts/contacts.routes';
+import { opportunityRoutes } from './features/opportunities/opportunities.routes';
+import { meetingRoutes } from './features/meetings/meetings.routes';
+import { networkRoutes } from './features/network/network.routes';
+import { introductionRoutes } from './features/introductions/introductions.routes';
+import { capabilityRoutes } from './features/capabilities/capabilities.routes';
 
 const Tasks = () => <div><h2>Tasks</h2><p>Deprecated. Tasks are now in Founder Decision Queue.</p></div>;
-const CapabilityIntelligence = () => <div><h2>Capability Intelligence</h2><p>Products and Services knowledge base goes here.</p></div>;
 const NotFound = () => <div><h2>404 - Not Found</h2><p>The requested workflow step does not exist.</p></div>;
 
-import { Navigate } from 'react-router-dom';
-
-export const routes = [
-  // Global Workspaces
+/**
+ * Root modular routing configuration.
+ * Individual feature teams (Contacts, Opportunities, Network) manage their routes inside
+ * their respective feature directories (e.g. features/opportunities/opportunities.routes.tsx).
+ * Do not add individual page routes directly here!
+ */
+export const routes: RouteObject[] = [
+  // Default entrypoint redirect
   { path: '/', element: <Navigate to="/people" replace /> },
-  { path: '/people', element: <PeopleWorkspace /> },
-  { path: '/people/:id', element: <Contact360Workspace /> },
-  { path: '/people/:id/transcript', element: <IntelligenceTranscriptWorkspace /> },
-  { path: '/people/:id/*', element: <Contact360Workspace /> },
-  { path: '/opportunities', element: <OpportunityWorkspace /> },
-  { path: '/opportunities/:id', element: <OpportunityDetailWorkspace /> },
-  { path: '/opportunities/:id/matching', element: <SolutionCapabilityMatchingWorkspace /> },
-  { path: '/opportunities/:id/network-matching', element: <NetworkMatchingWorkspace /> },
-  { path: '/opportunities/:id/introduction', element: <FounderIntroductionWorkspace /> },
-  { path: '/opportunities/:id/post-introduction', element: <PostIntroductionWorkspace /> },
-  { path: '/capabilities', element: <CapabilityWorkspace /> },
-  { path: '/products', element: <CapabilityWorkspace /> },
-  { path: '/network', element: <NetworkMap /> },
-  { path: '/deleted-connections', element: <DeletedConnectionsWorkspace /> },
 
-  // Legacy/Contextual Routes (Preserved for safe migration)
-  { path: '/contacts', element: <ContactList /> },
-  { path: '/contacts/new', element: <AddContact /> },
-  { path: '/contacts/:id/identify', element: <IdentifyPerson /> },
-  { path: '/contacts/:id/*', element: <Contact360 /> },
-  { path: '/people/:id/*', element: <Contact360 /> },
-  
-  { path: '/meetings/:id/brief', element: <MeetingBriefWorkspace /> },
-  { path: '/meetings/:id/capture', element: <MeetingCaptureWorkspace /> },
-  { path: '/meetings/:id/intelligence', element: <MeetingIntelligenceWorkspace /> },
-  { path: '/people/:id/context', element: <TrustedContextWorkspace /> },
-  
-  { path: '/network/matches/:id', element: <NetworkMatch /> },
-  { path: '/network/map', element: <NetworkMap /> },
-  { path: '/network/cross-client', element: <CrossClientIntel /> },
-  { path: '/network/events', element: <EcosystemEvents /> },
-  
-  { path: '/messages/:id/review', element: <MessageReview /> },
+  // Stream 1: Contacts & Identity
+  ...contactRoutes,
+
+  // Stream 2: Opportunities & Context
+  ...opportunityRoutes,
+  ...meetingRoutes,
+  ...capabilityRoutes,
+
+  // Stream 3: Network & Introductions
+  ...networkRoutes,
+  ...introductionRoutes,
+
+  // Global fallbacks
   { path: '/tasks', element: <Tasks /> },
-  { path: '/knowledge', element: <CapabilityIntelligence /> },
-  
   { path: '*', element: <NotFound /> }
 ];

@@ -9,7 +9,7 @@ export class ApiError extends Error {
 
 export const apiClient = {
   async get<T>(endpoint: string): Promise<T> {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
     const response = await fetch(`${baseUrl}${endpoint}`, {
       headers: { 'Authorization': 'Bearer mock-admin-token' }
     });
@@ -22,7 +22,7 @@ export const apiClient = {
   },
   
   async post<T>(endpoint: string, body: any): Promise<T> {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
     const response = await fetch(`${baseUrl}${endpoint}`, {
       method: 'POST',
       headers: { 
@@ -54,7 +54,7 @@ export const apiClient = {
   },
 
   async patch<T>(endpoint: string, body: any): Promise<T> {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
     const response = await fetch(`${baseUrl}${endpoint}`, {
       method: 'PATCH',
       headers: { 
@@ -70,7 +70,7 @@ export const apiClient = {
   },
 
   async delete<T>(endpoint: string): Promise<T> {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
     const response = await fetch(`${baseUrl}${endpoint}`, {
       method: 'DELETE',
       headers: { 

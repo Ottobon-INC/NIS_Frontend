@@ -5,7 +5,7 @@ export interface ContactOverview {
   name: string;
   title: string;
   company: string;
-  status: 'PROCESSING' | 'IDENTIFIED' | 'INTELLIGENCE_READY' | 'READY' | 'NEW' | 'RESEARCHING' | string;
+  status: 'READY' | 'NEW' | 'RESEARCHING' | 'PROCESSING' | 'IDENTIFIED' | 'INTELLIGENCE_READY' | string;
   lastUpdated: string;
 }
 
@@ -95,7 +95,7 @@ export interface Contact360Data {
     title: string;
     timestamp: string;
   }[];
-  
+
   // Legacy fields for backward compatibility
   primaryRole?: string;
   relationshipStrength?: string;
@@ -128,19 +128,19 @@ export interface Contact360Data {
 
 export const contactsApi = {
   list: () => apiClient.get<ContactOverview[]>('/api/v1/contacts'),
-  
+
   create: async (data: { linkedinUrl: string }) => {
     // 1. Create the contact
     const contact = await apiClient.post<{ id: string }>('/api/v1/contacts', {
       linkedin_url: data.linkedinUrl
     });
-    
+
     // 2. Trigger research for the contact
     const researchRes = await apiClient.post<{ success: boolean, research_run_id: string }>(
       `/api/v1/contacts/${contact.id}/research`,
       {}
     );
-    
+
     return { id: researchRes.research_run_id, status: 'QUEUED' };
   },
 
@@ -149,9 +149,9 @@ export const contactsApi = {
     const res = await apiClient.get<{ status: string, progress: any }>(`/api/v1/research/runs/${run_id}`);
     return { id: run_id, status: res.status };
   },
-  
+
   getIdentify: (id: string) => apiClient.get<IdentifyData>(`/api/v1/contacts/${id}/identify`),
-  
+
   confirmIdentify: async (id: string) => {
     return apiClient.patch(`/api/v1/contacts/${id}/identify`, { status: 'CONFIRMED' });
   },
