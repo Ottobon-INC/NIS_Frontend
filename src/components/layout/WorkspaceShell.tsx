@@ -7,6 +7,7 @@ interface WorkspaceShellProps {
   breadcrumbs?: { label: string; path: string }[];
   primaryAction?: { label: string; onClick: () => void; disabled?: boolean };
   secondaryActions?: { label: string; onClick: () => void; disabled?: boolean; variant?: 'primary' | 'secondary' | 'danger' }[];
+  headerActions?: React.ReactNode;
   isLoading?: boolean;
   isError?: boolean;
   isEmpty?: boolean;
@@ -20,6 +21,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
   breadcrumbs,
   primaryAction,
   secondaryActions,
+  headerActions,
   isLoading,
   isError,
   isEmpty,
@@ -54,7 +56,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
             {subtitle ? <p className="body-text text-secondary" style={{ marginTop: 'var(--space-2)' }}>{subtitle}</p> : null}
           </div>
           
-          <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'center' }}>
+            {headerActions ? headerActions : null}
             {secondaryActions ? secondaryActions.map(action => (
               <button 
                 key={action.label}

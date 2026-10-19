@@ -5,7 +5,7 @@ export interface ContactOverview {
   name: string;
   title: string;
   company: string;
-  status: 'PROCESSING' | 'IDENTIFIED' | 'INTELLIGENCE_READY';
+  status: 'READY' | 'NEW' | 'RESEARCHING' | 'PROCESSING' | 'IDENTIFIED' | 'INTELLIGENCE_READY' | string;
   lastUpdated: string;
 }
 
