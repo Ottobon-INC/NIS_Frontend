@@ -5,7 +5,7 @@ import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useContacts } from '../../../hooks/useContacts';
 import { contactsApi } from '../../../services/api/contacts.api';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 // ── CSV Import Modal ──────────────────────────────────────────────────────────
 interface ImportResult {
@@ -166,7 +166,7 @@ export const PeopleWorkspace: React.FC = () => {
   const { data: bhanuConnections = [] } = useQuery<any[]>({
     queryKey: ['bhanu-connections'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/v1/bhanu/connections?limit=200`, {
+      const res = await fetch(`${API_BASE}/api/v1/bhanu/connections?limit=1000`, {
         headers: { Authorization: 'Bearer mock-admin-token' }
       });
       if (!res.ok) return [];
@@ -199,8 +199,39 @@ export const PeopleWorkspace: React.FC = () => {
   
   const filteredContacts = React.useMemo(() => {
     if (!contacts) return [];
-    if (!query) return contacts;
-    return contacts.filter(c => 
+    const valid = contacts.filter(c => {
+      if (!c.name || c.name.trim() === '' || c.name === 'Unknown Contact' || c.name === 'Unknown' || c.name === 'Contact' || c.name === 'New Contact') return false;
+      const idLower = (c.id || '').toLowerCase();
+      if (idLower.startsWith('test-') || idLower.startsWith('contact-test-') || idLower.startsWith('contact-a-') || idLower.startsWith('contact-b-')) return false;
+      const nameLower = c.name.toLowerCase();
+      if (nameLower.includes('test') || nameLower.includes('candidate') || nameLower.includes('unique exec') || nameLower.includes('null test') || nameLower.includes('confidence test') || nameLower.includes('direct lookup') || nameLower.includes('compat test') || nameLower.includes('valid contact')) return false;
+      if (nameLower === 'dr. elena rostova' || nameLower === 'sarah connor' || nameLower === 'marcus vance' || nameLower === 'morgan stark') return false;
+      if (c.status === 'RESEARCHING' || c.status === 'PROCESSING' || c.status === 'NEW') return false;
+      if (c.title === 'Analyzing profile...' || c.company === 'Pending research') return false;
+      return true;
+    });
+
+    // Deduplicate by normalized name, keeping richer record
+    const seen = new Map<string, typeof valid[0]>();
+    for (const c of valid) {
+      const key = c.name.trim().toLowerCase();
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, c);
+      } else {
+        const existingScore = (existing.company && existing.company !== 'Independent' ? 2 : 0) + 
+                              (existing.title && existing.title !== 'Professional' ? 1 : 0);
+        const newScore = (c.company && c.company !== 'Independent' ? 2 : 0) + 
+                         (c.title && c.title !== 'Professional' ? 1 : 0);
+        if (newScore > existingScore) {
+          seen.set(key, c);
+        }
+      }
+    }
+    const deduped = Array.from(seen.values());
+
+    if (!query) return deduped;
+    return deduped.filter(c => 
       c.name.toLowerCase().includes(query) || 
       c.company.toLowerCase().includes(query) || 
       c.title.toLowerCase().includes(query)
@@ -209,8 +240,15 @@ export const PeopleWorkspace: React.FC = () => {
 
   const filteredBhanu = React.useMemo(() => {
     if (!bhanuConnections) return [];
-    if (!query) return bhanuConnections;
-    return bhanuConnections.filter((c: any) => 
+    const valid = bhanuConnections.filter((c: any) => 
+      c.full_name && 
+      c.full_name.trim() !== '' &&
+      c.full_name !== 'Unknown Contact' && 
+      c.full_name !== 'Unknown' && 
+      c.full_name !== 'Connection'
+    );
+    if (!query) return valid;
+    return valid.filter((c: any) => 
       (c.full_name || '').toLowerCase().includes(query) || 
       (c.current_company || '').toLowerCase().includes(query) || 
       (c.current_title || '').toLowerCase().includes(query)

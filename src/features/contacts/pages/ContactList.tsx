@@ -36,7 +36,7 @@ export const ContactList = () => {
               </tr>
             </thead>
             <tbody>
-              {Array.isArray(contacts) && contacts.map(c => (
+              {Array.isArray(contacts) && contacts.filter(c => c.name && c.name !== 'Unknown Contact' && c.name !== 'Unknown').map(c => (
                 <tr 
                   key={c.id} 
                   style={{ borderBottom: '1px solid var(--color-border)', cursor: 'pointer' }}

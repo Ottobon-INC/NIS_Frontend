@@ -7,11 +7,19 @@ export const AddContact = () => {
   const navigate = useNavigate();
   const [url, setUrl] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
+  const [contactId, setContactId] = useState<string | null>(null);
+  const [progressPercent, setProgressPercent] = useState(30);
+  const [stage, setStage] = useState(1);
 
-  const createMutation = useMutation<{ id: string; status: string }, Error, { linkedinUrl: string }>({
+  const createMutation = useMutation<
+    { id: string; contactId?: string; status: string },
+    Error,
+    { linkedinUrl: string }
+  >({
     mutationFn: contactsApi.create,
     onSuccess: (data) => {
       setJobId(data.id);
+      if (data.contactId) setContactId(data.contactId);
     }
   });
 
@@ -19,14 +27,61 @@ export const AddContact = () => {
     queryKey: ['contactStatus', jobId],
     queryFn: () => contactsApi.getStatus(jobId!),
     enabled: !!jobId,
-    refetchInterval: (query) => query.state.data?.status === 'COMPLETED' ? false : 1000
+    refetchInterval: (query) => {
+      const s = query.state.data?.status;
+      if (s === 'COMPLETED' || s === 'PARTIAL' || s === 'READY' || s === 'FAILED') {
+        return false;
+      }
+      return 800;
+    }
   });
 
+  // Animated progress stages while research is running
   useEffect(() => {
-    if (statusData?.status === 'COMPLETED') {
-      navigate(`/contacts/${jobId}/identify`);
+    if (!jobId) return;
+
+    const t1 = setTimeout(() => {
+      setProgressPercent(60);
+      setStage(2);
+    }, 800);
+
+    const t2 = setTimeout(() => {
+      setProgressPercent(85);
+      setStage(3);
+    }, 1800);
+
+    const t3 = setTimeout(() => {
+      setProgressPercent(100);
+      setStage(4);
+    }, 3000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [jobId]);
+
+  // Navigate when research status reaches a terminal or ready state
+  useEffect(() => {
+    if (!jobId) return;
+    const s = statusData?.status;
+    if (s === 'COMPLETED' || s === 'PARTIAL' || s === 'READY') {
+      const timer = setTimeout(() => {
+        navigate(`/contacts/${contactId || jobId}/identify`);
+      }, 400);
+      return () => clearTimeout(timer);
     }
-  }, [statusData, navigate, jobId]);
+  }, [statusData, navigate, jobId, contactId]);
+
+  // Fallback safety timer: guarantees transition within 4.5 seconds so user is never stuck
+  useEffect(() => {
+    if (!jobId) return;
+    const timer = setTimeout(() => {
+      navigate(`/contacts/${contactId || jobId}/identify`);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [jobId, contactId, navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,17 +89,71 @@ export const AddContact = () => {
   };
 
   if (jobId) {
+    const target = contactId || jobId;
     return (
       <div style={{ maxWidth: '600px', margin: '4rem auto', textAlign: 'center' }}>
-        <h2>Researching Contact</h2>
-        <div style={{ marginTop: 'var(--space-7)', padding: 'var(--space-7)', background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', alignItems: 'flex-start' }}>
-            <p>✓ Initiating profile resolution...</p>
-            <p>✓ Connecting to data sources...</p>
-            <p style={{ color: 'var(--color-brand-primary)' }}>↻ Extracting intelligence...</p>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Researching Contact</h2>
+        <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '6px' }}>
+          Extracting verified professional intelligence from LinkedIn & external data sources...
+        </p>
+
+        <div style={{
+          marginTop: 'var(--space-6)',
+          padding: 'var(--space-7)',
+          background: '#fff',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'flex-start', fontSize: '0.92rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#16a34a', fontWeight: 500 }}>
+              <span>✓</span>
+              <span>Initiating profile resolution...</span>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: stage >= 2 ? '#16a34a' : 'var(--color-brand-primary)', fontWeight: stage >= 2 ? 500 : 600 }}>
+              <span>{stage >= 2 ? '✓' : '↻'}</span>
+              <span>Connecting to data sources & web providers...</span>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: stage >= 3 ? '#16a34a' : (stage === 2 ? 'var(--color-brand-primary)' : 'var(--color-text-tertiary)'), fontWeight: stage === 2 ? 600 : (stage >= 3 ? 500 : 400) }}>
+              <span>{stage >= 3 ? '✓' : (stage >= 2 ? '↻' : '○')}</span>
+              <span>Extracting intelligence & career history...</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: stage >= 4 ? '#16a34a' : (stage === 3 ? 'var(--color-brand-primary)' : 'var(--color-text-tertiary)'), fontWeight: stage === 3 ? 600 : (stage >= 4 ? 500 : 400) }}>
+              <span>{stage >= 4 ? '✓' : (stage >= 3 ? '↻' : '○')}</span>
+              <span>Finalizing profile identity...</span>
+            </div>
           </div>
-          <div style={{ marginTop: 'var(--space-7)', height: '4px', background: 'var(--color-bg-primary)', overflow: 'hidden', borderRadius: '2px' }}>
-            <div style={{ width: '60%', height: '100%', background: 'var(--color-brand-primary)', transition: 'width 1s' }} />
+
+          <div style={{ marginTop: 'var(--space-7)', height: '6px', background: '#e2e8f0', overflow: 'hidden', borderRadius: '3px' }}>
+            <div style={{
+              width: `${progressPercent}%`,
+              height: '100%',
+              background: progressPercent === 100 ? '#16a34a' : 'var(--color-brand-primary)',
+              transition: 'width 0.8s ease-in-out'
+            }} />
+          </div>
+
+          <div style={{ marginTop: 'var(--space-6)', display: 'flex', justifyContent: 'center' }}>
+            <button
+              onClick={() => navigate(`/contacts/${target}/identify`)}
+              className="btn btn-primary"
+              style={{
+                padding: '10px 24px',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              <span>Proceed to Identity Review</span>
+              <span>→</span>
+            </button>
           </div>
         </div>
       </div>

@@ -17,7 +17,8 @@ export const NetworkMap: React.FC = () => {
 
   const filteredNodes = useMemo(() => {
     return nodes.filter(n => {
-      const matchesType = filterType === 'ALL' || n.type === filterType;
+      const nodeType = n.type as string;
+      const matchesType = filterType === 'ALL' || n.type === filterType || (filterType === 'PERSON' && (nodeType === 'PERSON' || nodeType === 'EXECUTIVE'));
       const matchesSearch = !searchTerm || n.label.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesType && matchesSearch;
     });
@@ -56,7 +57,7 @@ export const NetworkMap: React.FC = () => {
     );
   }
 
-  const personCount = nodes.filter(n => n.type === 'PERSON').length;
+  const personCount = nodes.filter(n => (n.type as string) === 'PERSON' || (n.type as string) === 'EXECUTIVE').length;
   const companyCount = nodes.filter(n => n.type === 'COMPANY').length;
 
   return (
@@ -140,7 +141,7 @@ export const NetworkMap: React.FC = () => {
           }}>
             {filteredNodes.map(node => {
               const isSelected = selectedNode?.id === node.id;
-              const isBhanu = node.id === 'bhanu-root';
+              const isFounder = node.id === 'bhanu-root' || node.id === 'node-ottobon' || (node.type as string) === 'FOUNDER';
               const isCompany = node.type === 'COMPANY';
 
               return (
@@ -149,8 +150,8 @@ export const NetworkMap: React.FC = () => {
                   onClick={() => setSelectedNodeId(node.id)}
                   style={{
                     padding: '14px',
-                    background: isBhanu ? '#4F46E5' : isSelected ? '#EFF6FF' : '#fff',
-                    color: isBhanu ? '#fff' : '#1E293B',
+                    background: isFounder ? '#4F46E5' : isSelected ? '#EFF6FF' : '#fff',
+                    color: isFounder ? '#fff' : '#1E293B',
                     border: isSelected ? '2px solid #3B82F6' : '1px solid var(--color-border)',
                     borderRadius: isCompany ? '10px' : '12px',
                     cursor: 'pointer',
@@ -166,12 +167,12 @@ export const NetworkMap: React.FC = () => {
                       fontSize: '10px', 
                       fontWeight: 700, 
                       letterSpacing: '0.5px',
-                      color: isBhanu ? 'rgba(255,255,255,0.8)' : isCompany ? '#059669' : '#6366F1' 
+                      color: isFounder ? 'rgba(255,255,255,0.8)' : isCompany ? '#059669' : '#6366F1' 
                     }}>
-                      {isBhanu ? 'FOUNDER' : node.type}
+                      {isFounder ? 'FOUNDER' : node.type}
                     </span>
                     {isCompany && <span style={{ fontSize: '14px' }}>🏢</span>}
-                    {!isCompany && !isBhanu && <span style={{ fontSize: '14px' }}>👤</span>}
+                    {!isCompany && !isFounder && <span style={{ fontSize: '14px' }}>👤</span>}
                   </div>
                   <div style={{ fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {node.label}
@@ -204,7 +205,7 @@ export const NetworkMap: React.FC = () => {
                   width: '44px',
                   height: '44px',
                   borderRadius: selectedNode.type === 'COMPANY' ? '8px' : '50%',
-                  background: selectedNode.id === 'bhanu-root' ? '#4F46E5' : selectedNode.type === 'COMPANY' ? '#10B981' : '#6366F1',
+                  background: (selectedNode.id === 'bhanu-root' || selectedNode.id === 'node-ottobon' || (selectedNode.type as string) === 'FOUNDER') ? '#4F46E5' : selectedNode.type === 'COMPANY' ? '#10B981' : '#6366F1',
                   color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
