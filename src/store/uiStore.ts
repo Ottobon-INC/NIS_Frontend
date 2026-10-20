@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 
-interface EvidenceState {
+export interface EvidenceState {
   isOpen: boolean;
   evidenceId: string | null;
-  type: 'FACT' | 'SIGNAL' | 'INFERENCE' | 'HYPOTHESIS' | 'CONFIRMED' | null;
+  type: 'FACT' | 'SIGNAL' | 'INFERENCE' | 'HYPOTHESIS' | 'CONFIRMED' | string | null;
   contentTitle?: string;
+  contactId?: string | null;
 }
 
 interface UIStore {
@@ -12,7 +13,7 @@ interface UIStore {
   toggleSidebar: () => void;
   
   evidenceDrawer: EvidenceState;
-  openEvidenceDrawer: (id: string, type: EvidenceState['type'], title?: string) => void;
+  openEvidenceDrawer: (id: string, type: EvidenceState['type'], title?: string, contactId?: string) => void;
   closeEvidenceDrawer: () => void;
 }
 
@@ -25,9 +26,10 @@ export const useUIStore = create<UIStore>((set) => ({
     evidenceId: null,
     type: null,
     contentTitle: undefined,
+    contactId: null,
   },
-  openEvidenceDrawer: (id, type, title) => set({
-    evidenceDrawer: { isOpen: true, evidenceId: id, type, contentTitle: title }
+  openEvidenceDrawer: (id, type, title, contactId) => set({
+    evidenceDrawer: { isOpen: true, evidenceId: id, type, contentTitle: title, contactId: contactId || null }
   }),
   closeEvidenceDrawer: () => set((state) => ({
     evidenceDrawer: { ...state.evidenceDrawer, isOpen: false }

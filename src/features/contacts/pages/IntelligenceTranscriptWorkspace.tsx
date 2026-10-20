@@ -306,7 +306,7 @@ export const IntelligenceTranscriptWorkspace: React.FC = () => {
                     {sig.evidenceId && (
                       <button 
                         className="button-text"
-                        onClick={() => openEvidenceDrawer(sig.evidenceId!, sig.level, sig.title)}
+                        onClick={() => openEvidenceDrawer(sig.evidenceId!, sig.level, sig.title, contact?.id || id)}
                         style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
                       >
                         View Evidence &rarr;

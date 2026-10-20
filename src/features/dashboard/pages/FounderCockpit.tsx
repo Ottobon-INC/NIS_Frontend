@@ -13,7 +13,9 @@ export const FounderCockpit: React.FC = () => {
   const { data: decisionItems, isLoading, isError } = useFounderDecisions();
 
   const handleDecisionAction = (item: DecisionItem) => {
-    if (item.type === 'VALIDATION_REQUIRED') {
+    if (item.actionUrl) {
+      navigate(item.actionUrl);
+    } else if (item.type === 'VALIDATION_REQUIRED') {
       navigate('/opportunities/123/validate');
     } else if (item.type === 'MATCH_REVIEW_REQUIRED') {
       navigate('/network/matches/match-456');

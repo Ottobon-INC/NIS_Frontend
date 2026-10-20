@@ -1,10 +1,41 @@
-import { http, HttpResponse, delay } from 'msw';
+import { http, HttpResponse, delay, passthrough } from 'msw';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 export const handlers = [
-  // Dashboard mock
-  http.get(`${API_BASE}/api/dashboard`, async () => {
+  // Cockpit & Dashboard Stats mock
+  http.get(`${API_BASE}/api/v1/cockpit/stats*`, async () => {
+    if (import.meta.env?.VITE_MOCK_DASHBOARD === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
+    await delay(600);
+    return HttpResponse.json({
+      pendingDecisions: 3,
+      activeOpportunities: 3,
+      networkNodes: 52,
+      validatedNeeds: 1,
+      introductionsSent: 4
+    });
+  }),
+
+  http.get(`${API_BASE}/api/cockpit/stats*`, async () => {
+    if (import.meta.env?.VITE_MOCK_DASHBOARD === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
+    await delay(600);
+    return HttpResponse.json({
+      pendingDecisions: 3,
+      activeOpportunities: 3,
+      networkNodes: 52,
+      validatedNeeds: 1,
+      introductionsSent: 4
+    });
+  }),
+
+  http.get(`${API_BASE}/api/dashboard*`, async () => {
+    if (import.meta.env?.VITE_MOCK_DASHBOARD === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
     await delay(800);
     return HttpResponse.json({
       stats: {
@@ -17,8 +48,52 @@ export const handlers = [
     });
   }),
 
-  // Founder Decisions mock
-  http.get(`${API_BASE}/api/founder/decisions`, async () => {
+  // Founder Cockpit Decision Queue mock
+  http.get(`${API_BASE}/api/v1/cockpit/queue*`, async () => {
+    if (import.meta.env?.VITE_MOCK_FOUNDER === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
+    await delay(600);
+    return HttpResponse.json({
+      queue: [
+        {
+          id: 'dec-01',
+          type: 'OPPORTUNITY_VALIDATION',
+          priority: 'HIGH',
+          title: 'Validate Detected Opportunity',
+          subtitle: 'David Chen · Apex Financial Group',
+          reason: 'AI inferred high-urgency compliance need with $100k+ budget signal.',
+          actionUrl: '/opportunities/opp-fintech-fraud-02',
+          createdAt: '2026-03-22T08:30:00Z'
+        },
+        {
+          id: 'dec-02',
+          type: 'INTRODUCTION_REVIEW',
+          priority: 'HIGH',
+          title: 'Approve Outbound Introduction Draft',
+          subtitle: 'Rahul Dhamdhere · Global Logistics Corp',
+          reason: 'Calibrated warm email intro drafted via Bhanu connection path.',
+          actionUrl: '/messages/draft-01/review',
+          createdAt: '2026-03-22T09:00:00Z'
+        },
+        {
+          id: 'dec-03',
+          type: 'NETWORK_MATCH_APPROVAL',
+          priority: 'MEDIUM',
+          title: 'Review Candidate Network Route',
+          subtitle: 'Meridian Freight Solutions via Priya Sharma',
+          reason: 'Single-hop connection detected with 4/5 relationship strength.',
+          actionUrl: '/network/matches/match-03',
+          createdAt: '2026-03-22T07:15:00Z'
+        }
+      ]
+    });
+  }),
+
+  http.get(`${API_BASE}/api/founder/decisions*`, async () => {
+    if (import.meta.env?.VITE_MOCK_FOUNDER === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
     await delay(800);
     return HttpResponse.json([
       {
@@ -54,6 +129,71 @@ export const handlers = [
         primaryActionLabel: 'Review Match'
       }
     ]);
+  }),
+
+  // Meeting Brief & Capture Mocks
+  http.get(`${API_BASE}/api/v1/meetings/:id/brief*`, async ({ params }) => {
+    if (import.meta.env?.VITE_MOCK_MEETINGS === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
+    await delay(500);
+    return HttpResponse.json({
+      meetingId: params.id,
+      contactName: 'Rahul Dhamdhere',
+      title: 'VP Engineering & Enterprise Architecture',
+      company: 'Global Logistics Corp',
+      meetingDate: '2026-03-24T15:00:00Z',
+      objective: 'Explore autonomous ABAP migration pilot for Q3 deliverables.',
+      talkingPoints: [
+        'Acknowledge recent public modernization milestone at Global Logistics.',
+        'Address specific technical bottleneck around custom SAP ECC table dependencies.',
+        'Propose a 3-week sandbox proof-of-concept with zero production downtime.'
+      ],
+      relationshipContext: {
+        strength: 4,
+        connectedVia: 'Bhanu (Alumni / Professional)',
+        lastInteraction: 'SAP Summit 2024'
+      }
+    });
+  }),
+
+  http.post(`${API_BASE}/api/v1/meetings/:id/capture*`, async ({ params }) => {
+    if (import.meta.env?.VITE_MOCK_MEETINGS === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
+    await delay(600);
+    return HttpResponse.json({
+      meetingId: params.id,
+      status: 'PROCESSING',
+      capturedAt: new Date().toISOString(),
+      extractedNeedsCount: 3
+    });
+  }),
+
+  http.get(`${API_BASE}/api/v1/meetings/:id/intelligence*`, async ({ params }) => {
+    if (import.meta.env?.VITE_MOCK_MEETINGS === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
+    await delay(500);
+    return HttpResponse.json({
+      meetingId: params.id,
+      findings: [
+        {
+          id: 'f-1',
+          type: 'PROBLEM',
+          claim: 'Team is struggling with legacy SAP ECC custom code regression.',
+          evidenceQuote: "'We have 200 custom ABAP programs with zero active documentation.'",
+          trustLevel: 'INFERENCE'
+        },
+        {
+          id: 'f-2',
+          type: 'REQUIREMENT',
+          claim: 'Target solution must run on-premise or in sovereign VPC.',
+          evidenceQuote: "'Data privacy policy forbids sending core ERP schemas outside EU boundary.'",
+          trustLevel: 'CONFIRMED'
+        }
+      ]
+    });
   }),
 
   // Contacts mock
@@ -325,6 +465,9 @@ export const handlers = [
 
   // --- Phase 6D Opportunity Handlers ---
   http.get(`${API_BASE}/api/opportunities`, async () => {
+    if (import.meta.env.VITE_MOCK_OPPORTUNITIES === 'false') {
+      return passthrough();
+    }
     await delay(800);
     return HttpResponse.json({
       opportunities: [
@@ -349,6 +492,9 @@ export const handlers = [
   }),
 
   http.get(`${API_BASE}/api/opportunities/:id`, async ({ params }) => {
+    if (import.meta.env.VITE_MOCK_OPPORTUNITIES === 'false') {
+      return passthrough();
+    }
     await delay(800);
     return HttpResponse.json({
       id: params.id,
@@ -373,13 +519,78 @@ export const handlers = [
   }),
 
   http.patch(`${API_BASE}/api/opportunities/:id/validate`, async () => {
+    if (import.meta.env.VITE_MOCK_OPPORTUNITIES === 'false') {
+      return passthrough();
+    }
     await delay(600);
     return HttpResponse.json({ success: true });
   }),
 
   // --- Phase 6E Capabilities & Matching Handlers ---
+  http.get(`${API_BASE}/api/v1/knowledge/capabilities*`, async () => {
+    if (import.meta.env?.VITE_MOCK_CAPABILITIES === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
+    await delay(600);
+    return HttpResponse.json([
+      {
+        id: 'cap-1',
+        name: 'Legacy Application Modernization',
+        description: 'Modernization of legacy applications while minimizing business disruption.'
+      },
+      {
+        id: 'cap-2',
+        name: 'Cloud Migration Strategy',
+        description: 'End-to-end strategy for migrating on-premise infrastructure to public or hybrid clouds.'
+      },
+      {
+        id: 'cap-3',
+        name: 'Security & Compliance Audit',
+        description: 'Comprehensive review mapped to SOC2, HIPAA, or ISO27001 requirements.'
+      }
+    ]);
+  }),
+
+  http.get(`${API_BASE}/api/v1/knowledge/products*`, async () => {
+    if (import.meta.env?.VITE_MOCK_CAPABILITIES === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
+    await delay(600);
+    return HttpResponse.json([
+      {
+        id: 'prod-janmasethu',
+        name: 'JanmaSethu',
+        tagline: 'Bridge to Parenthood — Journey-Aware Healthtech Platform',
+        category: 'Healthtech & Maternity',
+        description: 'A highly dynamic, ecosystem-driven healthtech platform designed to guide couples through the entire parenthood journey.',
+        features: JSON.stringify([
+          'Journey-Aware Architecture',
+          'Sakhi AI Chat Companion',
+          'Bilingual Experience',
+          'B2B Clinic Portal'
+        ])
+      },
+      {
+        id: 'prod-ottobon-courses',
+        name: 'Ottobon Course Platform',
+        tagline: "Don't just watch. Build. Structured AI-native learning for practical upskilling",
+        category: 'AI-Native EdTech',
+        description: 'A structured, AI-native guided upskilling environment inside the Ottobon Academy ecosystem.',
+        features: JSON.stringify([
+          '4-Stage Learning Framework',
+          'AI-Assisted Doubt Clarification',
+          'Real-World Sandboxes'
+        ])
+      }
+    ]);
+  }),
+
+  // Legacy fallback
   http.get(`${API_BASE}/api/capabilities`, async () => {
-    await delay(800);
+    if (import.meta.env?.VITE_MOCK_CAPABILITIES === 'false' || import.meta.env?.VITE_API_MODE !== 'mock') {
+      return passthrough();
+    }
+    await delay(600);
     return HttpResponse.json({
       capabilities: [
         {

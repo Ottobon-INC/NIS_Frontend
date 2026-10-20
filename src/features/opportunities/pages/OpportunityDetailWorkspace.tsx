@@ -42,12 +42,37 @@ export const OpportunityDetailWorkspace: React.FC = () => {
     >
       {opp && (
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-7)' }}>
-          
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
+            {/* Validation Error Banner */}
+            {validateMutation.isError && (
+              <div style={{
+                padding: 'var(--space-4)',
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: 'var(--radius-lg)',
+                color: '#991B1B',
+                fontSize: '13px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <strong>Validation Failed:</strong> {(validateMutation.error as any)?.message || 'An error occurred during validation.'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => validateMutation.reset()}
+                  style={{ background: 'none', border: 'none', color: '#991B1B', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+
             {opp.status === 'CANDIDATE' && (
               <div style={{ padding: 'var(--space-4)', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--radius-lg)' }}>
                 <p className="body-text-important" style={{ margin: 0, color: '#92400e' }}>
-                  <strong>System-Suggested Opportunity:</strong> This opportunity was generated from Trusted Context and requires Founder Validation before it can proceed to Matching.
+                  <strong>System-Suggested Opportunity:</strong> This opportunity was generated from verified research and requires Founder Validation before it can proceed to Matching.
                 </p>
               </div>
             )}
@@ -84,31 +109,85 @@ export const OpportunityDetailWorkspace: React.FC = () => {
               </div>
             </section>
 
-            {/* Trusted Context Provenance */}
+            {/* Product & Capability Fit (if matched) */}
+            {opp.matchedProductName && (
+              <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                  <h2 className="section-title" style={{ margin: 0, textTransform: 'uppercase' }}>Ottobon Product Fit</h2>
+                  {opp.matchScore !== null && opp.matchScore !== undefined && (
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#166534', background: '#F0FDF4', padding: '2px 8px', borderRadius: '4px', border: '1px solid #BBF7D0' }}>
+                      Fit Score: {opp.matchScore}%
+                    </span>
+                  )}
+                </div>
+                <div style={{ padding: 'var(--space-4)', background: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                  <h4 style={{ margin: '0 0 var(--space-2) 0', fontSize: '14px', color: '#1E293B', fontWeight: 600 }}>
+                    {opp.matchedProductName}
+                  </h4>
+                  {opp.matchRationale && (
+                    <p style={{ margin: 0, fontSize: '13px', color: '#475569', lineHeight: '1.4' }}>
+                      {opp.matchRationale}
+                    </p>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Review Audit Record (if validated or reviewed) */}
+            {opp.reviewedBy && (
+              <section style={{ background: '#F0FDF4', padding: 'var(--space-4)', borderRadius: 'var(--radius-lg)', border: '1px solid #BBF7D0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#166534' }}>
+                    Founder Review Confirmed ({opp.status})
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#15803D' }}>
+                    Reviewed by <strong>{opp.reviewedBy}</strong>
+                    {opp.reviewedAt && <> on {new Date(opp.reviewedAt).toLocaleString()}</>}
+                  </span>
+                </div>
+                {opp.reviewNotes && (
+                  <p style={{ margin: '6px 0 0 0', fontSize: '12px', fontStyle: 'italic', color: '#166534' }}>
+                    &ldquo;{opp.reviewNotes}&rdquo;
+                  </p>
+                )}
+              </section>
+            )}
+
+            {/* Trusted Context & Evidence Provenance */}
             <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
-                <h2 className="section-title" style={{ margin: 0, textTransform: 'uppercase' }}>Trusted Context</h2>
-                <button 
-                  className="button-text"
-                  onClick={() => navigate(`/people/${opp.personId}/context`)}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
-                >
-                  View Full Contact Context
-                </button>
+                <h2 className="section-title" style={{ margin: 0, textTransform: 'uppercase' }}>Trusted Context & Provenance</h2>
+                {opp.personId && (
+                  <button 
+                    className="button-text"
+                    onClick={() => navigate(`/people/${opp.personId}/context`)}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
+                  >
+                    View Full Contact Context
+                  </button>
+                )}
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                {opp.trustedContextIds.map(tcId => (
-                  <div key={tcId} style={{ padding: 'var(--space-4)', background: 'var(--color-bg-primary)', borderRadius: 'var(--radius-sm)', borderLeft: '4px solid var(--color-brand-primary)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-                      <TrustBadge level="CONFIRMED" />
-                      <span className="metadata text-secondary">ID: {tcId}</span>
+                {opp.trustedContextIds && opp.trustedContextIds.length > 0 ? (
+                  opp.trustedContextIds.map(tcId => (
+                    <div key={tcId} style={{ padding: 'var(--space-4)', background: 'var(--color-bg-primary)', borderRadius: 'var(--radius-sm)', borderLeft: '4px solid var(--color-brand-primary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                        <TrustBadge level="CONFIRMED" />
+                        <span className="metadata text-secondary">Trusted Context ID: {tcId}</span>
+                      </div>
+                      <p className="body-text" style={{ margin: 0 }}>
+                        This opportunity was directly derived from verified intelligence and trusted context.
+                      </p>
                     </div>
-                    <p className="body-text" style={{ margin: 0 }}>
-                      This opportunity was directly derived from founder-approved intelligence (Trusted Context).
+                  ))
+                ) : (
+                  <div style={{ padding: 'var(--space-4)', background: 'var(--color-bg-primary)', borderRadius: 'var(--radius-sm)' }}>
+                    <p className="body-text text-secondary" style={{ margin: 0 }}>
+                      Created via Opportunity Intelligence Engine with verified commercial signals.
                     </p>
                   </div>
-                ))}
+                )}
               </div>
             </section>
           </div>

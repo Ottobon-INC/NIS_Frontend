@@ -19,6 +19,7 @@ export interface DecisionItem {
   confidence: number;
   status: string;
   primaryActionLabel: string;
+  actionUrl?: string;
 }
 
 interface FounderDecisionQueueProps {

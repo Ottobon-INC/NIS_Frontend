@@ -38,9 +38,9 @@ export const Contact360 = () => {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-2)' }}>
             <h2 style={{ fontSize: 'var(--font-size-xl)', margin: 0 }}>{contact.name}</h2>
-            <span className="labels" style={{ background: '#D1FAE5', color: '#065F46', borderRadius: '12px' }}>{contact.relationshipStrength}</span>
+            <span className="labels" style={{ background: '#D1FAE5', color: '#065F46', borderRadius: '12px' }}>{contact.relationshipStrength || contact.relationship?.strength || 'Warm'}</span>
             <span className="labels" style={{ background: '#DBEAFE', color: '#1E40AF', borderRadius: '12px' }}>{contact.tier}</span>
-            <span className="labels" style={{ background: '#F3E8FF', color: '#6B21A8', borderRadius: '12px' }}>{contact.primaryRole}</span>
+            <span className="labels" style={{ background: '#F3E8FF', color: '#6B21A8', borderRadius: '12px' }}>{contact.primaryRole || contact.howTheyHelpUs?.[0]?.role || 'Potential Ally'}</span>
           </div>
           <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>{contact.title} • {contact.company}</p>
         </div>
@@ -81,7 +81,7 @@ export const Contact360 = () => {
               <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                 <li style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-brand-primary)' }} />
-                  <span>Recent signal: {contact.recentSignal}</span>
+                  <span>Recent signal: {contact.recentSignal || contact.signals?.[0]?.title || 'Profile indexed'}</span>
                 </li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-brand-primary)' }} />
