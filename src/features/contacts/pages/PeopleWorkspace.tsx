@@ -4,6 +4,7 @@ import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useContacts } from '../../../hooks/useContacts';
 import { contactsApi } from '../../../services/api/contacts.api';
+import { getAuthToken } from '../../../services/api/core/client.ts';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -42,10 +43,10 @@ const CsvImportModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const token = localStorage.getItem('auth_token') || 'mock-admin-token';
+      const token = getAuthToken();
       const res = await fetch(`${API_BASE}/api/v1/bhanu/import-csv`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: token } : {},
         body: formData,
       });
       if (!res.ok) {
@@ -166,8 +167,9 @@ export const PeopleWorkspace: React.FC = () => {
   const { data: bhanuConnections = [] } = useQuery<any[]>({
     queryKey: ['bhanu-connections'],
     queryFn: async () => {
+      const token = getAuthToken();
       const res = await fetch(`${API_BASE}/api/v1/bhanu/connections?limit=200`, {
-        headers: { Authorization: 'Bearer mock-admin-token' }
+        headers: token ? { Authorization: token } : {}
       });
       if (!res.ok) return [];
       return res.json();
