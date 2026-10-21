@@ -218,6 +218,7 @@ export interface OpportunityValidationData {
   canValidate?: boolean;
   identityGatePassed?: boolean;
   identityConfidence?: number;
+  identityGateReason?: string | null;
   businessProblem?: string;
   capabilityMatch?: string;
   supportingEvidenceIds?: string[];
