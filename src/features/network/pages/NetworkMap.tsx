@@ -310,7 +310,7 @@ export const NetworkMap: React.FC = () => {
                         )}
                       </div>
                       <p style={{ margin: 0, fontSize: '12px', color: '#B45309', lineHeight: 1.4 }}>
-                        To present this connection in People & Relationships, launch automated multi-source deep research.
+                        Launch automated multi-source deep research on this connection. Once researched, you can review and accept them into People & Relationships.
                       </p>
                       <button
                         disabled={researchingId === (selectedNode.contactId || selectedNode.id.replace('conn-', '').replace('target-', ''))}

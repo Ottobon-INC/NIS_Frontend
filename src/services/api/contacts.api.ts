@@ -8,6 +8,8 @@ export interface ContactOverview {
   status: 'READY' | 'NEW' | 'RESEARCHING' | 'PROCESSING' | 'IDENTIFIED' | 'INTELLIGENCE_READY' | string;
   lastUpdated: string;
   contact_type?: 'TARGET' | 'BHANU_CONNECTION' | string;
+  card_status?: string;
+  founder_reviewed?: boolean;
 }
 
 export interface IdentifyData {
@@ -100,6 +102,9 @@ export interface Contact360Data {
   location: string;
   linkedinUrl: string;
   tier: string;
+  card_status?: string;
+  founder_reviewed?: boolean;
+  contact_type?: string;
   relationshipStrength?: string;
   primaryRole?: string;
   recentSignal?: string;
@@ -309,6 +314,12 @@ export const contactsApi = {
     
   extractCompanyIntelligence: (contactId: string, companyName?: string) => 
     apiClient.post<CompanyIntelligenceData>(`/api/v1/contacts/${contactId}/company-intelligence`, { company_name: companyName }),
+
+  acceptContact: (id: string) =>
+    apiClient.post<{ success: boolean; contact_id: string; founder_reviewed: boolean }>(`/api/v1/contacts/${id}/accept`, {}),
+
+  declineContact: (id: string) =>
+    apiClient.post<{ success: boolean; contact_id: string }>(`/api/v1/contacts/${id}/decline`, {}),
 };
 
 export interface CompanyIntelligenceData {

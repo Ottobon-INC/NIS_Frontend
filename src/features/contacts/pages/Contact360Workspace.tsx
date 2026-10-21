@@ -18,6 +18,8 @@ export const Contact360Workspace: React.FC = () => {
   const { data: contact, isLoading, isError } = useContact360(id || '');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [targetStatus, setTargetStatus] = useState<string>('');
   const [reviewNotes, setReviewNotes] = useState('');
@@ -42,6 +44,34 @@ export const Contact360Workspace: React.FC = () => {
     }
   };
 
+  const handleAcceptContact = async () => {
+    if (!id || !contact) return;
+    try {
+      setIsAccepting(true);
+      await contactsApi.acceptContact(id);
+      await queryClient.invalidateQueries({ queryKey: ['contact360', id] });
+      await queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    } catch (err: any) {
+      alert(`Failed to accept contact: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
+  const handleDeclineContact = async () => {
+    if (!id || !contact) return;
+    if (window.confirm(`Decline and archive "${contact.name}"? They will not appear in People & Relationships.`)) {
+      try {
+        setIsDeclining(true);
+        await contactsApi.declineContact(id);
+        await queryClient.invalidateQueries({ queryKey: ['contacts'] });
+        navigate('/people');
+      } catch (err: any) {
+        alert(`Failed to decline contact: ${err.message || 'Unknown error'}`);
+        setIsDeclining(false);
+      }
+    }
+  };
 
   const handleDelete = async () => {
     if (!id || !contact) return;
@@ -75,6 +105,9 @@ export const Contact360Workspace: React.FC = () => {
       breadcrumbs={[{ label: 'People', path: '/people' }, { label: contact?.name || 'Contact 360', path: `/people/${id}` }]}
       primaryAction={{ label: 'Prepare Meeting', onClick: () => navigate(`/meetings/${id}/brief`) }}
       secondaryActions={[
+        ...(!contact?.founder_reviewed ? [
+          { label: isAccepting ? 'Accepting...' : '✓ Accept Profile', onClick: handleAcceptContact, variant: 'primary' as const, disabled: isAccepting }
+        ] : []),
         { label: 'Executive Summary', onClick: () => navigate(`/people/${id}/transcript`), variant: 'primary' },
         { label: isDeleting ? 'Deleting...' : 'Delete Contact', onClick: handleDelete, variant: 'danger', disabled: isDeleting }
       ]}
@@ -84,6 +117,97 @@ export const Contact360Workspace: React.FC = () => {
     >
       {contact && contact.full_markdown_report ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
+          {/* Founder Acceptance Status Banner */}
+          {!contact.founder_reviewed ? (
+            <div style={{
+              background: 'linear-gradient(135deg, #FEF3C7 0%, #FFFBEB 100%)',
+              border: '1px solid #FCD34D',
+              borderRadius: 'var(--radius-lg)',
+              padding: '16px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              flexWrap: 'wrap',
+              boxShadow: '0 2px 6px rgba(217, 119, 6, 0.08)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <span style={{ fontSize: '26px' }}>⏳</span>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#92400E' }}>
+                    Researched Candidate Pending Your Acceptance
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#B45309', marginTop: '2px' }}>
+                    This profile was researched by the AI agent. Accept this person to officially include them in your active <strong>People & Relationships</strong> network.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleAcceptContact}
+                  disabled={isAccepting}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'var(--color-brand-primary)',
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: isAccepting ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {isAccepting ? 'Accepting…' : '✓ Accept & Add to People'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeclineContact}
+                  disabled={isDeclining}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    background: '#fff',
+                    color: '#64748B',
+                    fontWeight: 500,
+                    fontSize: '13px',
+                    cursor: isDeclining ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {isDeclining ? 'Declining…' : '✕ Decline'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: '#EFF6FF',
+              border: '1px solid #BFDBFE',
+              borderRadius: 'var(--radius-lg)',
+              padding: '12px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ color: 'var(--color-brand-primary)', fontSize: '18px', fontWeight: 700 }}>✓</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#1E40AF' }}>
+                  Accepted Contact in People & Relationships
+                </span>
+                <span style={{ fontSize: '12px', color: '#3B82F6' }}>
+                  (Officially in your relationships network)
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Company Intelligence & Hiring Signals Card at the VERY TOP */}
           <CompanyIntelligenceCard
             contactId={contact.id}

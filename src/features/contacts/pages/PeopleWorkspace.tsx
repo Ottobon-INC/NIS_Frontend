@@ -161,8 +161,12 @@ export const PeopleWorkspace: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: contacts, isLoading, isError } = useContacts();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [decliningId, setDecliningId] = useState<string | null>(null);
+  const [actionToast, setActionToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [showImport, setShowImport] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'targets' | 'network'>('all');
+  const [viewMode, setViewMode] = useState<'accepted' | 'pending' | 'all'>('accepted');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'targets' | 'network'>('all');
 
   const deleteMutation = useMutation({
     mutationFn: (contactId: string) => contactsApi.delete(contactId),
@@ -176,6 +180,44 @@ export const PeopleWorkspace: React.FC = () => {
     }
   });
 
+  const acceptMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      setAcceptingId(contactId);
+      return await contactsApi.acceptContact(contactId);
+    },
+    onSuccess: (_data, contactId) => {
+      const contact = (contacts || []).find(c => c.id === contactId);
+      const name = contact?.name || 'Contact';
+      setActionToast({ message: `✓ "${name}" accepted into People & Relationships`, type: 'success' });
+      setTimeout(() => setActionToast(null), 4000);
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      setAcceptingId(null);
+    },
+    onError: (err: any) => {
+      alert(`Failed to accept contact: ${err.message || 'Unknown error'}`);
+      setAcceptingId(null);
+    }
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      setDecliningId(contactId);
+      return await contactsApi.declineContact(contactId);
+    },
+    onSuccess: (_data, contactId) => {
+      const contact = (contacts || []).find(c => c.id === contactId);
+      const name = contact?.name || 'Contact';
+      setActionToast({ message: `Declined "${name}". Profile archived.`, type: 'info' });
+      setTimeout(() => setActionToast(null), 4000);
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      setDecliningId(null);
+    },
+    onError: (err: any) => {
+      alert(`Failed to decline contact: ${err.message || 'Unknown error'}`);
+      setDecliningId(null);
+    }
+  });
+
   const handleDelete = (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation();
     if (window.confirm(`Are you sure you want to delete "${name || 'this contact'}"? This action cannot be undone.`)) {
@@ -186,20 +228,34 @@ export const PeopleWorkspace: React.FC = () => {
 
   const query = searchParams.get('q')?.toLowerCase() || '';
 
-  const targetCount = React.useMemo(() => {
-    return (contacts || []).filter(c => (c.contact_type || 'TARGET') === 'TARGET' || c.contact_type === 'TARGET_PROSPECT').length;
+  // Active (non-archived) contacts
+  const activeContacts = React.useMemo(() => {
+    return (contacts || []).filter(c => c.card_status !== 'ARCHIVED');
   }, [contacts]);
 
-  const networkCount = React.useMemo(() => {
-    return (contacts || []).filter(c => c.contact_type === 'BHANU_CONNECTION').length;
-  }, [contacts]);
+  const acceptedContacts = React.useMemo(() => {
+    return activeContacts.filter(c => Boolean(c.founder_reviewed));
+  }, [activeContacts]);
+
+  const pendingContacts = React.useMemo(() => {
+    return activeContacts.filter(c => !c.founder_reviewed);
+  }, [activeContacts]);
+
+  const acceptedCount = acceptedContacts.length;
+  const pendingCount = pendingContacts.length;
+  const totalCount = activeContacts.length;
+
+  const currentTabBaseList = React.useMemo(() => {
+    if (viewMode === 'accepted') return acceptedContacts;
+    if (viewMode === 'pending') return pendingContacts;
+    return activeContacts;
+  }, [viewMode, acceptedContacts, pendingContacts, activeContacts]);
 
   const filteredContacts = React.useMemo(() => {
-    if (!contacts) return [];
-    let list = contacts;
-    if (activeTab === 'targets') {
+    let list = currentTabBaseList;
+    if (typeFilter === 'targets') {
       list = list.filter(c => (c.contact_type || 'TARGET') === 'TARGET' || c.contact_type === 'TARGET_PROSPECT');
-    } else if (activeTab === 'network') {
+    } else if (typeFilter === 'network') {
       list = list.filter(c => c.contact_type === 'BHANU_CONNECTION');
     }
 
@@ -209,24 +265,49 @@ export const PeopleWorkspace: React.FC = () => {
       (c.company || '').toLowerCase().includes(query) || 
       (c.title || '').toLowerCase().includes(query)
     );
-  }, [contacts, activeTab, query]);
+  }, [currentTabBaseList, typeFilter, query]);
 
   return (
     <>
       {showImport && <CsvImportModal onClose={() => setShowImport(false)} />}
+      
+      {/* Toast notification */}
+      {actionToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: actionToast.type === 'success' ? '#1D4ED8' : '#1E293B',
+          color: '#fff',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          fontWeight: 600,
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          transition: 'all 0.3s ease'
+        }}>
+          {actionToast.message}
+        </div>
+      )}
+
       <WorkspaceShell
         title="People & Relationships"
-        subtitle={query ? `Search results for "${query}"` : "Active intelligence profiles with deep research and validated opportunities."}
+        subtitle={
+          query
+            ? `Search results for "${query}"`
+            : viewMode === 'accepted'
+              ? "Your active network. Only contacts you have explicitly accepted appear here."
+              : viewMode === 'pending'
+                ? "Researched candidates awaiting your review and acceptance."
+                : "All researched contacts across your workspace."
+        }
         isLoading={isLoading}
         isError={isError}
-        isEmpty={!isLoading && !isError && filteredContacts.length === 0}
-        emptyStateMessage={
-          query 
-            ? `No results found matching "${query}".` 
-            : activeTab === 'network'
-              ? "No contacts from Bhanu's network have been deep-researched yet. Open Network Intelligence to initiate deep research on any connection."
-              : "No researched people in your workspace yet."
-        }
+        isEmpty={false}
         headerActions={
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <button
@@ -276,7 +357,7 @@ export const PeopleWorkspace: React.FC = () => {
           </div>
         }
       >
-        {/* Network Discovery Callout Banner */}
+        {/* Network Discovery & Acceptance Guidance Callout Banner */}
         <div style={{
           background: 'linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%)',
           border: '1px solid #E2E8F0',
@@ -290,129 +371,270 @@ export const PeopleWorkspace: React.FC = () => {
           flexWrap: 'wrap'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '22px' }}>💡</span>
+            <span style={{ fontSize: '22px' }}>🛡️</span>
             <div>
               <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B' }}>
-                Only Deep-Researched Profiles appear in People & Relationships
+                Researched Profiles Require Your Acceptance
               </div>
               <div style={{ fontSize: '12px', color: '#64748B' }}>
-                Bhanu's full 820+ connection network is available in <strong>Network Intelligence</strong>. Click any node to initiate Deep Research and promote them here.
+                Researched contacts from Bhanu's 820+ network or new targets only enter <strong>People & Relationships</strong> once you accept them.
+                {pendingCount > 0 && (
+                  <span style={{ marginLeft: '6px', color: '#4F46E5', fontWeight: 600 }}>
+                    ({pendingCount} profile{pendingCount > 1 ? 's' : ''} awaiting review)
+                  </span>
+                )}
               </div>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/network')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '6px',
-              border: '1px solid #C7D2FE',
-              background: '#fff',
-              color: '#4F46E5',
-              fontWeight: 600,
-              fontSize: '12px',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 1px 2px rgba(79, 70, 229, 0.06)'
-            }}
-          >
-            Open Network Graph →
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {pendingCount > 0 && viewMode !== 'pending' && (
+              <button
+                onClick={() => setViewMode('pending')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#6366F1',
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 1px 3px rgba(99, 102, 241, 0.3)'
+                }}
+              >
+                Review Pending ({pendingCount}) →
+              </button>
+            )}
+            <button
+              onClick={() => navigate('/network')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '6px',
+                border: '1px solid #C7D2FE',
+                background: '#fff',
+                color: '#4F46E5',
+                fontWeight: 600,
+                fontSize: '12px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 2px rgba(79, 70, 229, 0.06)'
+              }}
+            >
+              Open Network Graph →
+            </button>
+          </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--color-border)', paddingBottom: '12px' }}>
+        {/* Primary Acceptance Status Tabs */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--color-border)', paddingBottom: '12px', flexWrap: 'wrap' }}>
           <button
-            onClick={() => setActiveTab('all')}
+            onClick={() => setViewMode('accepted')}
             style={{
               padding: '8px 18px',
               borderRadius: '8px',
-              border: activeTab === 'all' ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
+              border: viewMode === 'accepted' ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
               cursor: 'pointer',
               fontWeight: 600,
               fontSize: '13px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              background: activeTab === 'all' ? 'var(--color-brand-primary)' : '#fff',
-              color: activeTab === 'all' ? '#fff' : 'var(--color-text-secondary)',
+              background: viewMode === 'accepted' ? 'var(--color-brand-primary)' : '#fff',
+              color: viewMode === 'accepted' ? '#fff' : 'var(--color-text-secondary)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            👥 People & Relationships
+            <span style={{ 
+              fontSize: '11px', 
+              padding: '2px 7px', 
+              borderRadius: '10px', 
+              background: viewMode === 'accepted' ? 'rgba(255,255,255,0.25)' : '#EFF6FF',
+              color: viewMode === 'accepted' ? '#fff' : 'var(--color-brand-primary)',
+              fontWeight: 700
+            }}>
+              {acceptedCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setViewMode('pending')}
+            style={{
+              padding: '8px 18px',
+              borderRadius: '8px',
+              border: viewMode === 'pending' ? '1px solid #D97706' : '1px solid var(--color-border)',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: viewMode === 'pending' ? '#D97706' : '#fff',
+              color: viewMode === 'pending' ? '#fff' : 'var(--color-text-secondary)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            ⏳ Pending Acceptance
+            <span style={{ 
+              fontSize: '11px', 
+              padding: '2px 7px', 
+              borderRadius: '10px', 
+              background: viewMode === 'pending' ? 'rgba(255,255,255,0.25)' : '#FEF3C7',
+              color: viewMode === 'pending' ? '#fff' : '#B45309',
+              fontWeight: 700
+            }}>
+              {pendingCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setViewMode('all')}
+            style={{
+              padding: '8px 18px',
+              borderRadius: '8px',
+              border: viewMode === 'all' ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: viewMode === 'all' ? 'var(--color-brand-primary)' : '#fff',
+              color: viewMode === 'all' ? '#fff' : 'var(--color-text-secondary)',
               transition: 'all 0.15s ease'
             }}
           >
             All Researched
             <span style={{ 
               fontSize: '11px', 
-              padding: '2px 6px', 
+              padding: '2px 7px', 
               borderRadius: '10px', 
-              background: activeTab === 'all' ? 'rgba(255,255,255,0.25)' : '#F1F5F9',
-              color: activeTab === 'all' ? '#fff' : '#64748B'
+              background: viewMode === 'all' ? 'rgba(255,255,255,0.25)' : '#F1F5F9',
+              color: viewMode === 'all' ? '#fff' : '#64748B',
+              fontWeight: 700
             }}>
-              {(contacts || []).length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('targets')}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '8px',
-              border: activeTab === 'targets' ? '1px solid #0284c7' : '1px solid var(--color-border)',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '13px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: activeTab === 'targets' ? '#0284c7' : '#fff',
-              color: activeTab === 'targets' ? '#fff' : 'var(--color-text-secondary)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            🎯 Target Prospects
-            <span style={{ 
-              fontSize: '11px', 
-              padding: '2px 6px', 
-              borderRadius: '10px', 
-              background: activeTab === 'targets' ? 'rgba(255,255,255,0.25)' : '#E0F2FE',
-              color: activeTab === 'targets' ? '#fff' : '#0369A1'
-            }}>
-              {targetCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('network')}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '8px',
-              border: activeTab === 'network' ? '1px solid #6366f1' : '1px solid var(--color-border)',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '13px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: activeTab === 'network' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#fff',
-              color: activeTab === 'network' ? '#fff' : 'var(--color-text-secondary)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            🤝 Researched from Network
-            <span style={{ 
-              fontSize: '11px', 
-              padding: '2px 6px', 
-              borderRadius: '10px', 
-              background: activeTab === 'network' ? 'rgba(255,255,255,0.25)' : '#EEF2FF',
-              color: activeTab === 'network' ? '#fff' : '#4F46E5'
-            }}>
-              {networkCount}
+              {totalCount}
             </span>
           </button>
         </div>
 
-        {/* Contacts Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 'var(--space-6)' }}>
+        {/* Secondary Category / Type Filter */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', marginRight: '4px' }}>Filter:</span>
+          <button
+            onClick={() => setTypeFilter('all')}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '6px',
+              border: typeFilter === 'all' ? '1px solid #475569' : '1px solid #E2E8F0',
+              background: typeFilter === 'all' ? '#F1F5F9' : '#fff',
+              color: typeFilter === 'all' ? '#1E293B' : '#64748B',
+              fontSize: '12px',
+              fontWeight: typeFilter === 'all' ? 600 : 500,
+              cursor: 'pointer'
+            }}
+          >
+            All Types
+          </button>
+          <button
+            onClick={() => setTypeFilter('targets')}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '6px',
+              border: typeFilter === 'targets' ? '1px solid #0284C7' : '1px solid #E2E8F0',
+              background: typeFilter === 'targets' ? '#E0F2FE' : '#fff',
+              color: typeFilter === 'targets' ? '#0369A1' : '#64748B',
+              fontSize: '12px',
+              fontWeight: typeFilter === 'targets' ? 600 : 500,
+              cursor: 'pointer'
+            }}
+          >
+            🎯 Targets
+          </button>
+          <button
+            onClick={() => setTypeFilter('network')}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '6px',
+              border: typeFilter === 'network' ? '1px solid #6366F1' : '1px solid #E2E8F0',
+              background: typeFilter === 'network' ? '#EEF2FF' : '#fff',
+              color: typeFilter === 'network' ? '#4F46E5' : '#64748B',
+              fontSize: '12px',
+              fontWeight: typeFilter === 'network' ? 600 : 500,
+              cursor: 'pointer'
+            }}
+          >
+            🤝 Network
+          </button>
+        </div>
+
+        {/* Empty state action helper when viewMode === 'accepted' and acceptedCount === 0 */}
+        {viewMode === 'accepted' && acceptedCount === 0 && pendingCount > 0 && (
+          <div style={{
+            background: '#EFF6FF',
+            border: '1px dashed #BFDBFE',
+            borderRadius: '12px',
+            padding: '32px 24px',
+            textAlign: 'center',
+            marginBottom: '24px'
+          }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>📋</div>
+            <h3 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: 700, color: '#1E40AF' }}>
+              You have {pendingCount} researched profile{pendingCount > 1 ? 's' : ''} waiting for your acceptance
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#2563EB', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
+              To keep your active People & Relationships clean, candidates are held in the review queue until you accept them.
+            </p>
+            <button
+              onClick={() => setViewMode('pending')}
+              style={{
+                padding: '9px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--color-brand-primary)',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
+              }}
+            >
+              Review Pending Profiles ({pendingCount}) →
+            </button>
+          </div>
+        )}
+
+        {/* Contacts Grid or Empty State */}
+        {filteredContacts.length === 0 ? (
+          <div style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            border: '1px dashed var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            background: '#fff',
+            marginTop: '8px'
+          }}>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '15px', margin: 0, fontWeight: 500 }}>
+              {query 
+                ? `No results found matching "${query}".` 
+                : viewMode === 'accepted'
+                  ? pendingCount > 0
+                    ? `No accepted contacts matching this filter. You have ${pendingCount} researched profile${pendingCount > 1 ? 's' : ''} in Pending Acceptance.`
+                    : "No accepted people matching this filter."
+                  : viewMode === 'pending'
+                    ? "No profiles currently pending acceptance. All researched contacts have been accepted!"
+                    : "No researched people in your workspace."}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 'var(--space-6)' }}>
           {filteredContacts.map(contact => {
             const isBhanuConnection = contact.contact_type === 'BHANU_CONNECTION';
+            const isAccepted = Boolean(contact.founder_reviewed);
+            const isAccepting = acceptingId === contact.id;
+            const isDeclining = decliningId === contact.id;
+
             return (
               <div 
                 key={contact.id} 
@@ -427,7 +649,8 @@ export const PeopleWorkspace: React.FC = () => {
                   flexDirection: 'column',
                   gap: 'var(--space-4)',
                   transition: 'all 0.2s',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                  position: 'relative'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
@@ -435,7 +658,9 @@ export const PeopleWorkspace: React.FC = () => {
                     width: '40px',
                     height: '40px',
                     borderRadius: '50%',
-                    background: isBhanuConnection ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'var(--color-brand-primary)',
+                    background: isBhanuConnection
+                      ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+                      : 'var(--color-brand-primary)',
                     color: '#fff',
                     display: 'flex',
                     alignItems: 'center',
@@ -456,8 +681,41 @@ export const PeopleWorkspace: React.FC = () => {
                   </div>
                 </div>
                 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 'var(--space-2)' }}>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {/* Badges Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Acceptance Badge */}
+                    {isAccepted ? (
+                      <span style={{
+                        fontSize: '11px',
+                        padding: '3px 8px',
+                        background: '#EFF6FF',
+                        color: 'var(--color-brand-primary)',
+                        border: '1px solid #BFDBFE',
+                        borderRadius: 'var(--radius-sm)',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        ✓ Accepted
+                      </span>
+                    ) : (
+                      <span style={{
+                        fontSize: '11px',
+                        padding: '3px 8px',
+                        background: '#FEF3C7',
+                        color: '#B45309',
+                        borderRadius: 'var(--radius-sm)',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        ⏳ Pending Acceptance
+                      </span>
+                    )}
+
                     <span className="labels" style={{ 
                       fontSize: 'var(--font-size-xs)', 
                       padding: '3px 8px', 
@@ -493,6 +751,58 @@ export const PeopleWorkspace: React.FC = () => {
                       </span>
                     )}
                   </div>
+                </div>
+
+                {/* Actions Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 'var(--space-2)', borderTop: '1px solid #F1F5F9' }}>
+                  {!isAccepted ? (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => acceptMutation.mutate(contact.id)}
+                        disabled={isAccepting}
+                        style={{
+                          padding: '5px 12px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: 'var(--color-brand-primary)',
+                          color: '#fff',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: isAccepting ? 'not-allowed' : 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          boxShadow: '0 1px 3px rgba(37, 99, 235, 0.25)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {isAccepting ? 'Accepting…' : '✓ Accept'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => declineMutation.mutate(contact.id)}
+                        disabled={isDeclining}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #CBD5E1',
+                          background: '#fff',
+                          color: '#64748B',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: isDeclining ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {isDeclining ? 'Declining…' : '✕ Decline'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: 'var(--color-brand-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span>✓ In People Network</span>
+                    </div>
+                  )}
 
                   <button
                     type="button"
@@ -544,7 +854,8 @@ export const PeopleWorkspace: React.FC = () => {
               </div>
             );
           })}
-        </div>
+          </div>
+        )}
       </WorkspaceShell>
     </>
   );
