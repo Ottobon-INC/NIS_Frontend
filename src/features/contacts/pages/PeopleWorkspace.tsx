@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useContacts } from '../../../hooks/useContacts';
 import { contactsApi } from '../../../services/api/contacts.api';
 import { getAuthToken } from '../../../services/api/core/client.ts';
+import { networkApi } from '../../../services/api/network.api';
+import { NetworkGraphCanvas } from '../../network/components/NetworkGraphCanvas';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -165,8 +167,36 @@ export const PeopleWorkspace: React.FC = () => {
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [actionToast, setActionToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [showImport, setShowImport] = useState(false);
-  const [viewMode, setViewMode] = useState<'accepted' | 'pending' | 'all'>('accepted');
+  const [viewMode, setViewMode] = useState<'accepted' | 'pending' | 'all' | 'graph'>('accepted');
   const [typeFilter, setTypeFilter] = useState<'all' | 'targets' | 'network'>('all');
+
+  // Network graph view state
+  const [graphSelectedNodeId, setGraphSelectedNodeId] = useState<string | null>(null);
+  const [graphFilterType, setGraphFilterType] = useState<'ALL' | 'PERSON' | 'COMPANY'>('ALL');
+  const [graphSearch, setGraphSearch] = useState('');
+  const [graphResearchingId, setGraphResearchingId] = useState<string | null>(null);
+
+  const { data: graphData, isLoading: isGraphLoading, isError: isGraphError, refetch: refetchGraph } = useQuery({
+    queryKey: ['networkGraph'],
+    queryFn: () => networkApi.getGraph(),
+    enabled: viewMode === 'graph',
+  });
+
+  const handleGraphTriggerResearch = async (contactId?: string) => {
+    if (!contactId) return;
+    setGraphResearchingId(contactId);
+    try {
+      await networkApi.triggerDeepResearch(contactId);
+      setActionToast({ message: `🚀 Research launched! Contact will appear in Pending Acceptance once analyzed.`, type: 'info' });
+      setTimeout(() => setActionToast(null), 4000);
+      await queryClient.invalidateQueries({ queryKey: ['networkGraph'] });
+      await queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      setGraphResearchingId(null);
+    } catch (e: any) {
+      alert(`Failed to launch deep research: ${e.message || 'Unknown error'}`);
+      setGraphResearchingId(null);
+    }
+  };
 
   const deleteMutation = useMutation({
     mutationFn: (contactId: string) => contactsApi.delete(contactId),
@@ -266,6 +296,30 @@ export const PeopleWorkspace: React.FC = () => {
       (c.title || '').toLowerCase().includes(query)
     );
   }, [currentTabBaseList, typeFilter, query]);
+
+  // Graph data calculations
+  const rawGraphNodes = useMemo(() => graphData?.nodes || [], [graphData]);
+  const rawGraphEdges = useMemo(() => graphData?.edges || [], [graphData]);
+
+  const filteredGraphNodes = useMemo(() => {
+    return rawGraphNodes.filter(n => {
+      const matchesType = graphFilterType === 'ALL' || n.type === graphFilterType;
+      const matchesSearch = !graphSearch || 
+        n.label.toLowerCase().includes(graphSearch.toLowerCase()) || 
+        (n.company || '').toLowerCase().includes(graphSearch.toLowerCase());
+      return matchesType && matchesSearch;
+    });
+  }, [rawGraphNodes, graphFilterType, graphSearch]);
+
+  const selectedGraphNode = useMemo(() => {
+    if (!graphSelectedNodeId) return rawGraphNodes[0] || null;
+    return rawGraphNodes.find(n => n.id === graphSelectedNodeId) || null;
+  }, [rawGraphNodes, graphSelectedNodeId]);
+
+  const connectedGraphEdges = useMemo(() => {
+    if (!selectedGraphNode) return [];
+    return rawGraphEdges.filter(e => e.source === selectedGraphNode.id || e.target === selectedGraphNode.id);
+  }, [rawGraphEdges, selectedGraphNode]);
 
   return (
     <>
@@ -407,21 +461,25 @@ export const PeopleWorkspace: React.FC = () => {
               </button>
             )}
             <button
-              onClick={() => navigate('/network')}
+              onClick={() => setViewMode(viewMode === 'graph' ? 'accepted' : 'graph')}
               style={{
                 padding: '6px 14px',
                 borderRadius: '6px',
-                border: '1px solid #C7D2FE',
-                background: '#fff',
-                color: '#4F46E5',
+                border: viewMode === 'graph' ? '1px solid #4F46E5' : '1px solid #C7D2FE',
+                background: viewMode === 'graph' ? '#4F46E5' : '#fff',
+                color: viewMode === 'graph' ? '#fff' : '#4F46E5',
                 fontWeight: 600,
                 fontSize: '12px',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                boxShadow: '0 1px 2px rgba(79, 70, 229, 0.06)'
+                boxShadow: '0 1px 2px rgba(79, 70, 229, 0.06)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
               }}
             >
-              Open Network Graph →
+              {viewMode === 'graph' ? '📋 Back to People List' : '🕸️ Open Network Graph →'}
             </button>
           </div>
         </div>
@@ -517,9 +575,359 @@ export const PeopleWorkspace: React.FC = () => {
               {totalCount}
             </span>
           </button>
+
+          <button
+            onClick={() => setViewMode('graph')}
+            style={{
+              padding: '8px 18px',
+              borderRadius: '8px',
+              border: viewMode === 'graph' ? '1px solid #4F46E5' : '1px solid var(--color-border)',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: viewMode === 'graph' ? '#4F46E5' : '#fff',
+              color: viewMode === 'graph' ? '#fff' : 'var(--color-text-secondary)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            🕸️ Visual Network Graph
+            <span style={{ 
+              fontSize: '11px', 
+              padding: '2px 7px', 
+              borderRadius: '10px', 
+              background: viewMode === 'graph' ? 'rgba(255,255,255,0.25)' : '#EEF2FF',
+              color: viewMode === 'graph' ? '#fff' : '#4F46E5',
+              fontWeight: 700
+            }}>
+              Interactive
+            </span>
+          </button>
         </div>
 
-        {/* Secondary Category / Type Filter */}
+        {viewMode === 'graph' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Top Toolbar */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+              background: '#fff',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              border: '1px solid var(--color-border)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '260px' }}>
+                <span style={{ fontSize: '16px' }}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search person or company in network graph..."
+                  value={graphSearch}
+                  onChange={(e) => setGraphSearch(e.target.value)}
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '13px',
+                    color: '#1E293B',
+                    background: 'transparent'
+                  }}
+                />
+                {graphSearch && (
+                  <button
+                    onClick={() => setGraphSearch('')}
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8', fontSize: '12px' }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {(['ALL', 'PERSON', 'COMPANY'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setGraphFilterType(t)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: graphFilterType === t ? '#4F46E5' : '#F1F5F9',
+                      color: graphFilterType === t ? '#fff' : '#64748B',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {t === 'ALL' ? '🌐 All Entities' : t === 'PERSON' ? '👤 People' : '🏢 Companies'}
+                  </button>
+                ))}
+                <button
+                  onClick={() => refetchGraph()}
+                  title="Refresh Graph"
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #E2E8F0',
+                    background: '#fff',
+                    color: '#64748B',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ⟲
+                </button>
+              </div>
+            </div>
+
+            {/* Graph Loading / Error / Canvas Grid */}
+            {isGraphLoading ? (
+              <div style={{ padding: '60px 24px', textAlign: 'center', background: '#fff', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'inline-block', width: '32px', height: '32px', border: '3px solid #E2E8F0', borderTopColor: '#6366F1', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                <p style={{ marginTop: '16px', fontSize: '14px', color: '#64748B', fontWeight: 500 }}>
+                  Generating interactive network graph with real-time relationship edges...
+                </p>
+              </div>
+            ) : isGraphError ? (
+              <div style={{ padding: '32px', textAlign: 'center', background: '#FEF2F2', borderRadius: '12px', border: '1px solid #FCA5A5' }}>
+                <p style={{ color: '#DC2626', fontWeight: 600, margin: '0 0 12px' }}>Failed to load network graph data.</p>
+                <button
+                  onClick={() => refetchGraph()}
+                  style={{ padding: '8px 16px', background: '#DC2626', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '16px', alignItems: 'start' }}>
+                {/* Visual Graph Canvas */}
+                <div style={{
+                  background: '#F8FAFC',
+                  borderRadius: '12px',
+                  border: '1px solid var(--color-border)',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                }}>
+                  <NetworkGraphCanvas
+                    nodes={filteredGraphNodes}
+                    edges={rawGraphEdges}
+                    selectedNodeId={graphSelectedNodeId}
+                    onSelectNode={(nodeId) => setGraphSelectedNodeId(nodeId)}
+                    height="620px"
+                  />
+                </div>
+
+                {/* Right: Selected Node Inspector */}
+                <div style={{
+                  background: '#fff',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '12px',
+                  padding: '18px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                  maxHeight: '620px',
+                  overflowY: 'auto'
+                }}>
+                  <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '12px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#6366F1' }}>
+                      Node Inspector
+                    </div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#1E293B', marginTop: '2px' }}>
+                      {selectedGraphNode ? selectedGraphNode.label : 'Select a node'}
+                    </div>
+                  </div>
+
+                  {selectedGraphNode ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '44px',
+                          height: '44px',
+                          borderRadius: selectedGraphNode.type === 'COMPANY' ? '8px' : '50%',
+                          background: selectedGraphNode.id === 'bhanu-root' ? '#6366F1' : selectedGraphNode.type === 'COMPANY' ? '#10B981' : '#2563EB',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '16px',
+                          flexShrink: 0
+                        }}>
+                          {selectedGraphNode.type === 'COMPANY' ? '🏢' : selectedGraphNode.label.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div style={{ overflow: 'hidden', flex: 1 }}>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {selectedGraphNode.label}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {selectedGraphNode.role && selectedGraphNode.company
+                              ? `${selectedGraphNode.role} · ${selectedGraphNode.company}`
+                              : selectedGraphNode.company || selectedGraphNode.role || selectedGraphNode.type}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          background: selectedGraphNode.id === 'bhanu-root' ? '#EEF2FF' : selectedGraphNode.type === 'COMPANY' ? '#ECFDF5' : selectedGraphNode.hasResearch ? '#EFF6FF' : '#F1F5F9',
+                          color: selectedGraphNode.id === 'bhanu-root' ? '#4F46E5' : selectedGraphNode.type === 'COMPANY' ? '#047857' : selectedGraphNode.hasResearch ? '#1D4ED8' : '#475569',
+                        }}>
+                          {selectedGraphNode.id === 'bhanu-root' ? 'FOUNDER (ROOT)' : selectedGraphNode.type === 'COMPANY' ? 'ENTERPRISE COMPANY' : selectedGraphNode.hasResearch ? 'RESEARCHED CANDIDATE' : 'NETWORK CONNECTION'}
+                        </span>
+                      </div>
+
+                      {/* Deep Research Action Panel */}
+                      {selectedGraphNode.type === 'PERSON' && selectedGraphNode.id !== 'bhanu-root' && (
+                        <div style={{ marginTop: '4px' }}>
+                          {selectedGraphNode.hasResearch ? (
+                            <div style={{ padding: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: '#166534' }}>
+                                  ✅ Profile Researched
+                                </span>
+                                <span style={{ fontSize: '10px', background: '#DCFCE7', color: '#15803D', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                  READY
+                                </span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '12px', color: '#15803D', lineHeight: 1.4 }}>
+                                Verified intel, career signals, and product fit are available.
+                              </p>
+                              <button
+                                onClick={() => {
+                                  const targetId = selectedGraphNode.contactId || selectedGraphNode.id.replace('conn-', '').replace('target-', '');
+                                  navigate(`/people/${targetId}`);
+                                }}
+                                style={{
+                                  marginTop: '4px',
+                                  padding: '8px 12px',
+                                  background: '#16A34A',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontWeight: 600,
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px'
+                                }}
+                              >
+                                View Contact Details & Fit →
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ padding: '12px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 700, color: '#1D4ED8' }}>
+                                ⚡ Unresearched Connection
+                              </div>
+                              <p style={{ margin: 0, fontSize: '12px', color: '#2563EB', lineHeight: 1.4 }}>
+                                Run deep intelligence gathering on this connection to identify semantic product mapping and relationship pathways.
+                              </p>
+                              <button
+                                disabled={graphResearchingId === (selectedGraphNode.contactId || selectedGraphNode.id.replace('conn-', '').replace('target-', ''))}
+                                onClick={() => {
+                                  const targetId = selectedGraphNode.contactId || selectedGraphNode.id.replace('conn-', '').replace('target-', '');
+                                  handleGraphTriggerResearch(targetId);
+                                }}
+                                style={{
+                                  marginTop: '4px',
+                                  padding: '8px 12px',
+                                  background: '#2563EB',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontWeight: 600,
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  opacity: graphResearchingId ? 0.7 : 1
+                                }}
+                              >
+                                {graphResearchingId === (selectedGraphNode.contactId || selectedGraphNode.id.replace('conn-', '').replace('target-', ''))
+                                  ? 'Launching Research...'
+                                  : '🚀 Launch Deep Research'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Direct Relationships */}
+                      <div style={{ marginTop: '8px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+                          Connected Relationships ({connectedGraphEdges.length})
+                        </div>
+                        {connectedGraphEdges.length === 0 ? (
+                          <div style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic' }}>
+                            No direct connections in graph.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {connectedGraphEdges.slice(0, 8).map((edge, idx) => {
+                              const otherId = edge.source === selectedGraphNode.id ? edge.target : edge.source;
+                              const otherNode = rawGraphNodes.find(n => n.id === otherId);
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => setGraphSelectedNodeId(otherId)}
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    padding: '6px 10px',
+                                    background: '#F8FAFC',
+                                    border: '1px solid #E2E8F0',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    fontSize: '12px',
+                                    color: '#334155'
+                                  }}
+                                >
+                                  <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {otherNode ? otherNode.label : otherId}
+                                  </span>
+                                  <span style={{ fontSize: '10px', color: '#6366F1', fontWeight: 600, flexShrink: 0, marginLeft: '6px' }}>
+                                    {edge.label || 'Connected'} →
+                                  </span>
+                                </button>
+                              );
+                            })}
+                            {connectedGraphEdges.length > 8 && (
+                              <div style={{ fontSize: '11px', color: '#94A3B8', textAlign: 'center', marginTop: '4px' }}>
+                                + {connectedGraphEdges.length - 8} more connections
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#94A3B8', padding: '24px 0', fontSize: '13px' }}>
+                      Click on any node in the canvas to inspect its profile and relationships.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Secondary Category / Type Filter */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', marginRight: '4px' }}>Filter:</span>
           <button
@@ -855,6 +1263,8 @@ export const PeopleWorkspace: React.FC = () => {
             );
           })}
           </div>
+        )}
+          </>
         )}
       </WorkspaceShell>
     </>

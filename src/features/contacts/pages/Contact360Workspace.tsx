@@ -232,19 +232,25 @@ export const Contact360Workspace: React.FC = () => {
               {/* Header with Badges & Safeguards */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: contact.commercialIntelligence.provenanceStatus === 'VERIFIED CURRENT' ? '#ECFDF5' : '#FFFBEB',
-                    color: contact.commercialIntelligence.provenanceStatus === 'VERIFIED CURRENT' ? '#047857' : '#B45309',
-                    border: `1px solid ${contact.commercialIntelligence.provenanceStatus === 'VERIFIED CURRENT' ? '#A7F3D0' : '#FDE68A'}`
-                  }}>
-                    {contact.commercialIntelligence.provenanceStatus}
-                  </span>
+                  {(() => {
+                    const ps = contact.commercialIntelligence.provenanceStatus;
+                    const isVerified = ps === 'VERIFIED CURRENT' || ps === 'CONFIRMED' || ps === 'VERIFIED';
+                    return (
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        padding: '4px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: isVerified ? '#ECFDF5' : '#FFFBEB',
+                        color: isVerified ? '#047857' : '#B45309',
+                        border: `1px solid ${isVerified ? '#A7F3D0' : '#FDE68A'}`
+                      }}>
+                        {ps}
+                      </span>
+                    );
+                  })()}
                   <span style={{
                     fontSize: '13px',
                     fontWeight: 600,
@@ -470,21 +476,98 @@ export const Contact360Workspace: React.FC = () => {
               </div>
 
 
-              {contact.commercialIntelligence.smallestSolvableProblem && (
-                <div style={{
-                  padding: 'var(--space-4)',
-                  background: '#F8FAFC',
-                  borderRadius: 'var(--radius-sm)',
-                  borderLeft: '4px solid #4F46E5'
-                }}>
-                  <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>
-                    Smallest Worthwhile Solvable Problem
+              {/* Commercial Opportunity Details Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: 'var(--space-3)'
+              }}>
+                {contact.commercialIntelligence.ottobonCapabilityMatch && (
+                  <div style={{
+                    padding: 'var(--space-4)',
+                    background: '#F0F9FF',
+                    borderRadius: 'var(--radius-sm)',
+                    borderLeft: '4px solid #0284C7'
+                  }}>
+                    <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0369A1', fontWeight: 700, marginBottom: '4px' }}>
+                      Identified Capability Match
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#0C4A6E', fontWeight: 600 }}>
+                      {contact.commercialIntelligence.ottobonCapabilityMatch}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>
-                    {contact.commercialIntelligence.smallestSolvableProblem}
+                )}
+
+                {contact.commercialIntelligence.broadBusinessProblem && (
+                  <div style={{
+                    padding: 'var(--space-4)',
+                    background: '#F8FAFC',
+                    borderRadius: 'var(--radius-sm)',
+                    borderLeft: '4px solid #6366F1'
+                  }}>
+                    <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4F46E5', fontWeight: 700, marginBottom: '4px' }}>
+                      Target Problem Statement
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500, lineHeight: 1.4 }}>
+                      &ldquo;{contact.commercialIntelligence.broadBusinessProblem}&rdquo;
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
+                {contact.commercialIntelligence.smallestSolvableProblem && (
+                  <div style={{
+                    padding: 'var(--space-4)',
+                    background: '#F8FAFC',
+                    borderRadius: 'var(--radius-sm)',
+                    borderLeft: '4px solid #4F46E5'
+                  }}>
+                    <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700, marginBottom: '4px' }}>
+                      Smallest Worthwhile Solvable Problem
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500, lineHeight: 1.4 }}>
+                      {contact.commercialIntelligence.smallestSolvableProblem}
+                    </div>
+                  </div>
+                )}
+
+                {contact.commercialIntelligence.proposedFirstEngagement && (
+                  <div style={{
+                    padding: 'var(--space-4)',
+                    background: '#F8FAFC',
+                    borderRadius: 'var(--radius-sm)',
+                    borderLeft: '4px solid #10B981'
+                  }}>
+                    <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#047857', fontWeight: 700, marginBottom: '4px' }}>
+                      Proposed First Engagement
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500, lineHeight: 1.4 }}>
+                      {contact.commercialIntelligence.proposedFirstEngagement}
+                    </div>
+                  </div>
+                )}
+
+                {(contact.commercialIntelligence.estimatedEffortHours || contact.commercialIntelligence.costPricingEstimate) && (
+                  <div style={{
+                    padding: 'var(--space-4)',
+                    background: '#F8FAFC',
+                    borderRadius: 'var(--radius-sm)',
+                    borderLeft: '4px solid #F59E0B'
+                  }}>
+                    <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#B45309', fontWeight: 700, marginBottom: '4px' }}>
+                      Commercial Delivery Parameters
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>
+                      {contact.commercialIntelligence.estimatedEffortHours && (
+                        <span>Effort: <strong>{contact.commercialIntelligence.estimatedEffortHours}</strong></span>
+                      )}
+                      {contact.commercialIntelligence.estimatedEffortHours && contact.commercialIntelligence.costPricingEstimate && ' • '}
+                      {contact.commercialIntelligence.costPricingEstimate && (
+                        <span>Indicative: <strong>{contact.commercialIntelligence.costPricingEstimate}</strong></span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {contact.commercialIntelligence.sourcesUsed && contact.commercialIntelligence.sourcesUsed.length > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
