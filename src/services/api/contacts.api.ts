@@ -7,6 +7,7 @@ export interface ContactOverview {
   company: string;
   status: 'READY' | 'NEW' | 'RESEARCHING' | 'PROCESSING' | 'IDENTIFIED' | 'INTELLIGENCE_READY' | string;
   lastUpdated: string;
+  contact_type?: 'TARGET' | 'BHANU_CONNECTION' | string;
 }
 
 export interface IdentifyData {
@@ -242,6 +243,8 @@ export interface EvidenceDetail {
 
 export const contactsApi = {
   list: () => apiClient.get<ContactOverview[]>('/api/v1/contacts'),
+  triggerResearch: (contactId: string) => 
+    apiClient.post<{ job_id: string; contact_id: string; status: string }>(`/api/v1/research/jobs/contact/${contactId}`, {}),
   
   // Legacy create & research
   create: async (data: { linkedinUrl: string }) => {
