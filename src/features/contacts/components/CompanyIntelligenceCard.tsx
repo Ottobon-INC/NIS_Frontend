@@ -48,7 +48,7 @@ export const CompanyIntelligenceCard: React.FC<CompanyIntelligenceCardProps> = (
         }
         return res;
       } catch (err: any) {
-        if (err.response?.status === 404) {
+        if (err.status === 404 || err.response?.status === 404) {
           return null;
         }
         throw err;
@@ -71,7 +71,8 @@ export const CompanyIntelligenceCard: React.FC<CompanyIntelligenceCardProps> = (
       }
     },
     onError: (err: any) => {
-      alert(`Company intelligence extraction failed: ${err.response?.data?.detail || err.message || 'Error occurred'}`);
+      const msg = err.data?.detail || err.data?.error?.message || err.response?.data?.detail || err.message || 'Error occurred';
+      alert(`Company intelligence extraction failed: ${msg}`);
     }
   });
 
