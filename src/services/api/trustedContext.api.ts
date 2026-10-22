@@ -17,10 +17,25 @@ export interface TrustedContextItem {
   history: TrustedContextVersion[];
 }
 
+export interface TrustedContextCreatePayload {
+  contact_id?: string;
+  type?: 'PROBLEM' | 'REQUIREMENT' | 'PERSON' | 'SIGNAL';
+  content: string;
+  evidence?: string;
+  source_meeting_id?: string;
+  confidence?: number;
+}
+
 export const trustedContextApi = {
   getForContact: (contactId: string) => 
     apiClient.get<{ items: TrustedContextItem[] }>(`/api/contacts/${contactId}/trusted-context`),
     
+  createForContact: (contactId: string, payload: TrustedContextCreatePayload) =>
+    apiClient.post<TrustedContextItem>(`/api/contacts/${contactId}/trusted-context`, payload),
+
   updateContext: (itemId: string, newContent: string) => 
-    apiClient.patch<{ success: boolean }>(`/api/trusted-context/${itemId}`, { content: newContent })
+    apiClient.patch<{ success: boolean; item?: TrustedContextItem }>(`/api/trusted-context/${itemId}`, { content: newContent }),
+
+  deleteContext: (itemId: string) =>
+    apiClient.delete<{ success: boolean }>(`/api/trusted-context/${itemId}`),
 };

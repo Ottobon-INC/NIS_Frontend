@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
-import { useOpportunities, useCreateOpportunity, useDeriveOpportunity } from '../../../hooks/useOpportunities';
+import { useOpportunitySearch, useCreateOpportunity, useDeriveOpportunity } from '../../../hooks/useOpportunities';
 import { useContacts } from '../../../hooks/useContacts';
 import { TrustBadge } from '../../../components/intelligence/TrustBadge';
 
@@ -10,6 +10,20 @@ export const OpportunityWorkspace: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'CANDIDATE' | 'VALIDATED'>('ALL');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creationMode, setCreationMode] = useState<'DERIVE' | 'MANUAL'>('DERIVE');
+
+  // Search and Facet state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [minConfidence, setMinConfidence] = useState<number>(0);
+
+  // Debounce search query changes by 300ms
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   // Derivation state
   const [selectedContactId, setSelectedContactId] = useState('');
@@ -25,10 +39,27 @@ export const OpportunityWorkspace: React.FC = () => {
   const [manualBudget, setManualBudget] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Queries & Mutations
-  const { data, isLoading, isError } = useOpportunities(
-    selectedStatus === 'ALL' ? undefined : { status: selectedStatus }
-  );
+  // Live PostgreSQL-backed search query
+  const isFiltering = !!debouncedSearchQuery || selectedStatus !== 'ALL' || selectedCategory !== 'ALL' || minConfidence > 0;
+
+  const { data: searchData, isLoading, isError } = useOpportunitySearch({
+    q: debouncedSearchQuery || undefined,
+    status: selectedStatus === 'ALL' ? undefined : selectedStatus,
+    opportunity_type: selectedCategory === 'ALL' ? undefined : selectedCategory,
+    min_confidence: minConfidence > 0 ? minConfidence : undefined,
+  });
+
+  const opportunities = searchData?.results || [];
+  const totalCount = searchData?.total ?? 0;
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setDebouncedSearchQuery('');
+    setSelectedStatus('ALL');
+    setSelectedCategory('ALL');
+    setMinConfidence(0);
+  };
+
   const { data: contactsList, isLoading: isContactsLoading } = useContacts();
   const deriveMutation = useDeriveOpportunity();
   const createMutation = useCreateOpportunity();
@@ -115,52 +146,222 @@ export const OpportunityWorkspace: React.FC = () => {
       }}
       isLoading={isLoading}
       isError={isError}
-      isEmpty={!isLoading && !isError && (!data?.opportunities || data.opportunities.length === 0)}
+      isEmpty={!isLoading && !isError && opportunities.length === 0}
       emptyStateMessage={
-        selectedStatus === 'ALL'
-          ? 'No commercial opportunities detected. Establish more Trusted Context or create an opportunity.'
-          : `No opportunities found with status "${selectedStatus}".`
+        isFiltering
+          ? 'No commercial opportunities match the specified search and filter criteria.'
+          : 'No commercial opportunities detected. Establish more Trusted Context or create an opportunity.'
       }
     >
-      {/* Status Filter Tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-6)', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          {(['ALL', 'CANDIDATE', 'VALIDATED'] as const).map((st) => {
-            const isActive = selectedStatus === st;
-            const label = st === 'ALL' ? 'All Opportunities' : st === 'CANDIDATE' ? 'Review Pending (Candidate)' : 'Validated';
-            return (
-              <button
-                key={st}
-                onClick={() => setSelectedStatus(st)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: 'var(--font-size-sm)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  border: isActive ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
-                  background: isActive ? 'var(--color-brand-primary)' : '#fff',
-                  color: isActive ? '#fff' : 'var(--color-text-secondary)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
+      {/* Live Search & Facet Filter Bar */}
+      <div style={{
+        background: '#ffffff',
+        padding: 'var(--space-5)',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--color-border)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+        marginBottom: 'var(--space-6)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-4)'
+      }}>
+        {/* Search Input Field */}
+        <div style={{ position: 'relative', width: '100%' }}>
+          <div style={{
+            position: 'absolute',
+            left: '14px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--color-text-secondary)',
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Search live opportunities across problem statements, requirements, companies, or champions..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '11px 36px 11px 40px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
+              fontSize: '14px',
+              outline: 'none',
+              boxSizing: 'border-box',
+              background: '#f8fafc',
+              color: '#0f172a',
+              transition: 'border-color 0.15s ease, background 0.15s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = 'var(--color-brand-primary)';
+              e.target.style.background = '#ffffff';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'var(--color-border)';
+              if (!e.target.value) e.target.style.background = '#f8fafc';
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                fontSize: '18px',
+                padding: '2px',
+                lineHeight: 1
+              }}
+              title="Clear search"
+            >
+              ×
+            </button>
+          )}
         </div>
 
-        {data && (
-          <div className="metadata text-secondary">
-            Showing {data.opportunities.length} of {data.total} {data.total === 1 ? 'opportunity' : 'opportunities'}
+        {/* Faceted Filter Toolbar */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 'var(--space-3)',
+          paddingTop: 'var(--space-2)'
+        }}>
+          {/* Status Tabs */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            {(['ALL', 'CANDIDATE', 'VALIDATED'] as const).map((st) => {
+              const isActive = selectedStatus === st;
+              const label = st === 'ALL' ? 'All Opportunities' : st === 'CANDIDATE' ? 'Review Pending (Candidate)' : 'Validated';
+              return (
+                <button
+                  key={st}
+                  onClick={() => setSelectedStatus(st)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: isActive ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
+                    background: isActive ? 'var(--color-brand-primary)' : '#fff',
+                    color: isActive ? '#fff' : 'var(--color-text-secondary)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-        )}
+
+          {/* Facet Controls */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Category Filter */}
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+                fontSize: 'var(--font-size-sm)',
+                background: '#fff',
+                color: selectedCategory !== 'ALL' ? 'var(--color-brand-primary)' : 'var(--color-text-primary)',
+                fontWeight: selectedCategory !== 'ALL' ? 600 : 400,
+                cursor: 'pointer'
+              }}
+            >
+              <option value="ALL">All Categories</option>
+              <option value="JOB_OPENING">💼 Job Openings (Scraped)</option>
+              <option value="ENTERPRISE_AI_PILOT">Enterprise AI Pilot</option>
+              <option value="STRATEGIC_INTELLIGENCE">Strategic Intelligence</option>
+              <option value="PREDICTIVE_LOGISTICS">Predictive Logistics</option>
+              <option value="DATA_MODERNIZATION">Data Modernization</option>
+              <option value="Digital Transformation">Digital Transformation</option>
+            </select>
+
+            {/* Minimum Confidence Filter */}
+            <select
+              value={minConfidence}
+              onChange={(e) => setMinConfidence(Number(e.target.value))}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+                fontSize: 'var(--font-size-sm)',
+                background: '#fff',
+                color: minConfidence > 0 ? 'var(--color-brand-primary)' : 'var(--color-text-primary)',
+                fontWeight: minConfidence > 0 ? 600 : 400,
+                cursor: 'pointer'
+              }}
+            >
+              <option value={0}>Any Confidence</option>
+              <option value={50}>Confidence ≥ 50%</option>
+              <option value={70}>Confidence ≥ 70%</option>
+              <option value={85}>Confidence ≥ 85%</option>
+            </select>
+
+            {/* Reset Filters */}
+            {isFiltering && (
+              <button
+                onClick={handleClearFilters}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px dashed #cbd5e1',
+                  background: '#f8fafc',
+                  color: '#64748b',
+                  fontSize: 'var(--font-size-sm)',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#1e293b';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Results Metadata Counter */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: 'var(--color-text-secondary)', borderTop: '1px solid #f1f5f9', paddingTop: 'var(--space-2)' }}>
+          <span>
+            Showing <strong>{opportunities.length}</strong> of <strong>{totalCount}</strong> opportunities
+            {debouncedSearchQuery ? ` matching "${debouncedSearchQuery}"` : ''}
+          </span>
+          {debouncedSearchQuery && (
+            <span style={{ fontSize: '12px', color: '#059669', fontWeight: 600 }}>
+              Live SQL Relevance Ranked
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Opportunity Cards Grid */}
-      {data && data.opportunities.length > 0 && (
+      {opportunities.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 'var(--space-6)' }}>
-          {data.opportunities.map(opp => (
+          {opportunities.map(opp => (
             <div 
               key={opp.id} 
               onClick={() => navigate(`/opportunities/${opp.id}`)}
@@ -178,7 +379,7 @@ export const OpportunityWorkspace: React.FC = () => {
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = 'var(--color-brand-primary)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = 'var(--color-border)';
@@ -187,7 +388,23 @@ export const OpportunityWorkspace: React.FC = () => {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
                 <div style={{ flex: 1 }}>
-                  <h3 className="card-title" style={{ margin: '0 0 var(--space-1) 0', fontSize: '16px' }}>{opp.title}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                    <h3 className="card-title" style={{ margin: 0, fontSize: '16px' }}>{opp.title}</h3>
+                    {debouncedSearchQuery && opp.relevanceScore !== undefined && (
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        background: opp.relevanceScore >= 80 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+                        color: opp.relevanceScore >= 80 ? '#047857' : '#1d4ed8',
+                        border: opp.relevanceScore >= 80 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        Relevance {opp.relevanceScore}%
+                      </span>
+                    )}
+                  </div>
                   <p className="body-text text-secondary" style={{ margin: 0, fontSize: '13px' }}>
                     {opp.personName || 'Unassigned Executive'} · <strong>{opp.companyName}</strong>
                   </p>
@@ -206,6 +423,25 @@ export const OpportunityWorkspace: React.FC = () => {
                   </span>
                 )}
               </div>
+
+              {/* Match Reasons Chips */}
+              {debouncedSearchQuery && opp.matchReasons && opp.matchReasons.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {opp.matchReasons.map((reason, idx) => (
+                    <span key={idx} style={{
+                      fontSize: '11px',
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #e2e8f0',
+                      fontWeight: 500
+                    }}>
+                      {reason}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <div>
                 <p className="labels text-secondary" style={{ margin: '0 0 var(--space-1) 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -232,8 +468,51 @@ export const OpportunityWorkspace: React.FC = () => {
                     Confidence {opp.confidence}%
                   </span>
                 </div>
-                <div className="metadata text-secondary" style={{ fontSize: '12px' }}>
-                  {new Date(opp.updatedAt).toLocaleDateString()}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {opp.opportunityType === 'JOB_OPENING' && opp.supportingEvidenceIds && opp.supportingEvidenceIds.length > 0 && (
+                    <a
+                      href={opp.supportingEvidenceIds[0]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        fontSize: '11px',
+                        color: '#4338ca',
+                        background: '#eef2ff',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        border: '1px solid #c7d2fe',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#e0e7ff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#eef2ff';
+                      }}
+                    >
+                      Apply ↗
+                    </a>
+                  )}
+                  <span style={{
+                    fontSize: '11px',
+                    color: opp.opportunityType === 'JOB_OPENING' ? '#4338ca' : '#64748b',
+                    background: opp.opportunityType === 'JOB_OPENING' ? '#f5f3ff' : '#f8fafc',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    border: opp.opportunityType === 'JOB_OPENING' ? '1px solid #ddd6fe' : '1px solid #e2e8f0',
+                    fontWeight: opp.opportunityType === 'JOB_OPENING' ? 600 : 400
+                  }}>
+                    {opp.opportunityType === 'JOB_OPENING' ? '💼 Job Opening' : opp.opportunityType}
+                  </span>
+                  <div className="metadata text-secondary" style={{ fontSize: '12px' }}>
+                    {new Date(opp.updatedAt).toLocaleDateString()}
+                  </div>
                 </div>
               </div>
             </div>

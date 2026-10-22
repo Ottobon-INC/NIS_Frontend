@@ -110,6 +110,26 @@ export interface OpportunityPipelineItem {
   nextAction: string;
 }
 
+export interface OpportunitySearchResult extends Opportunity {
+  relevanceScore: number;
+  matchReasons: string[];
+}
+
+export interface OpportunitySearchParams {
+  q?: string;
+  status?: string;
+  min_confidence?: number;
+  opportunity_type?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface OpportunitySearchResponse {
+  query: string;
+  total: number;
+  results: OpportunitySearchResult[];
+}
+
 export const opportunitiesApi = {
   list: (params?: OpportunityListParams) => {
     const searchParams = new URLSearchParams();
@@ -128,6 +148,30 @@ export const opportunitiesApi = {
     const query = searchParams.toString();
     return apiClient.get<{ opportunities: Opportunity[]; total: number }>(`/api/v1/opportunities${query ? `?${query}` : ''}`);
   },
+
+  search: (params?: OpportunitySearchParams) => {
+    const searchParams = new URLSearchParams();
+    if (params?.q) {
+      searchParams.set('q', params.q);
+    }
+    if (params?.status && params.status !== 'ALL') {
+      searchParams.set('status', params.status);
+    }
+    if (params?.min_confidence !== undefined && params.min_confidence > 0) {
+      searchParams.set('min_confidence', String(params.min_confidence));
+    }
+    if (params?.opportunity_type && params.opportunity_type !== 'ALL') {
+      searchParams.set('opportunity_type', params.opportunity_type);
+    }
+    if (params?.limit) {
+      searchParams.set('limit', String(params.limit));
+    }
+    if (params?.offset) {
+      searchParams.set('offset', String(params.offset));
+    }
+    const query = searchParams.toString();
+    return apiClient.get<OpportunitySearchResponse>(`/api/v1/opportunities/search${query ? `?${query}` : ''}`);
+  },
   
   getById: (id: string) => apiClient.get<Opportunity>(`/api/v1/opportunities/${id}`),
 
@@ -138,9 +182,14 @@ export const opportunitiesApi = {
   validate: (id: string, payload?: OpportunityValidatePayload) => 
     apiClient.patch<OpportunityValidationResponse>(`/api/v1/opportunities/${id}/validate`, payload || { status: 'VALIDATED' }),
 
+  // Job scraping pipeline trigger & status
+  triggerJobScraping: () => apiClient.post<{ success: boolean; message: string; result: any }>('/api/v1/opportunities/scrape-jobs/trigger', {}),
+  getJobScrapingStatus: () => apiClient.get<{ scheduler_configured: string; is_running: boolean; last_run_at: string | null; last_summary: any; database_metrics: any }>('/api/v1/opportunities/scrape-jobs/status'),
+
   // Downstream legacy methods preserved
   getSolutions: (id: string) => apiClient.get<{ solutions: SolutionCandidate[] }>(`/api/opportunities/${id}/solutions`),
   setPath: (id: string, path: string) => apiClient.patch<{ success: boolean }>(`/api/opportunities/${id}/path`, { path }),
   getPipeline: () => apiClient.get<{ pipeline: OpportunityPipelineItem[] }>(`/api/opportunities/pipeline`),
   postOutcome: (id: string, outcome: string, notes: string) => apiClient.post<{ success: boolean }>(`/api/opportunities/${id}/outcome`, { outcome, notes }),
 };
+

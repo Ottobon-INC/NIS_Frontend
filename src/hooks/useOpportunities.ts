@@ -3,13 +3,21 @@ import { opportunitiesApi } from '../services/api/opportunities.api';
 import type { 
   OpportunityCreatePayload, 
   OpportunityValidatePayload, 
-  OpportunityListParams 
+  OpportunityListParams,
+  OpportunitySearchParams,
 } from '../services/api/opportunities.api';
 
 export const useOpportunities = (params?: OpportunityListParams) => {
   return useQuery({
     queryKey: ['opportunities', params],
     queryFn: () => opportunitiesApi.list(params)
+  });
+};
+
+export const useOpportunitySearch = (params?: OpportunitySearchParams) => {
+  return useQuery({
+    queryKey: ['opportunities-search', params],
+    queryFn: () => opportunitiesApi.search(params)
   });
 };
 
