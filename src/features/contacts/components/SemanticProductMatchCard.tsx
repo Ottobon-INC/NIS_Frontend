@@ -8,6 +8,7 @@ interface SemanticProductMatchCardProps {
   contactCompany?: string;
   contactTitle?: string;
   defaultProblem?: string;
+  onMatchResult?: (res: SemanticProductMatchResponse | null) => void;
 }
 
 export const SemanticProductMatchCard: React.FC<SemanticProductMatchCardProps> = ({
@@ -15,7 +16,8 @@ export const SemanticProductMatchCard: React.FC<SemanticProductMatchCardProps> =
   contactName,
   contactCompany,
   contactTitle,
-  defaultProblem = ''
+  defaultProblem = '',
+  onMatchResult
 }) => {
   const [problemText, setProblemText] = useState(defaultProblem);
   const [isCustomMode, setIsCustomMode] = useState(false);
@@ -44,9 +46,11 @@ export const SemanticProductMatchCard: React.FC<SemanticProductMatchCardProps> =
           connection_title: contactTitle
         });
         setMatchResult(res);
+        onMatchResult?.(res);
       } else {
         const res = await matchingApi.semanticMatchConnection(contactId);
         setMatchResult(res);
+        onMatchResult?.(res);
         if (res.identified_problem) {
           setProblemText(res.identified_problem);
         }

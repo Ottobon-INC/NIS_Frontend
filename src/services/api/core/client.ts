@@ -150,6 +150,15 @@ export const apiClient = {
     return handleResponse<T>(response);
   },
 
+  async put<T>(endpoint: string, body: any, customHeaders?: HeadersInit): Promise<T> {
+    const response = await fetch(`${getBaseUrl()}${endpoint}`, {
+      method: 'PUT',
+      headers: buildHeaders(customHeaders, 'application/json'),
+      body: JSON.stringify(body)
+    });
+    return handleResponse<T>(response);
+  },
+
   async delete<T>(endpoint: string, customHeaders?: HeadersInit): Promise<T> {
     const response = await fetch(`${getBaseUrl()}${endpoint}`, {
       method: 'DELETE',
