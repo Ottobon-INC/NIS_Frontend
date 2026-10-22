@@ -461,6 +461,45 @@ export const OpportunityWorkspace: React.FC = () => {
                 </p>
               </div>
 
+              {/* Direct Job Link display for Job Openings */}
+              {(opp.opportunityType === 'JOB_OPENING' || opp.applyUrl || (opp.supportingEvidenceIds && opp.supportingEvidenceIds.some(u => u.startsWith('http')))) && (() => {
+                const effectiveApplyUrl = opp.applyUrl || (opp.supportingEvidenceIds && opp.supportingEvidenceIds.find(u => u.startsWith('http')));
+                if (!effectiveApplyUrl) return null;
+                return (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 10px',
+                    background: '#f8fafc',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '12px'
+                  }}>
+                    <span style={{ fontWeight: 600, color: '#4338ca', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      🔗 Job Link:
+                    </span>
+                    <a
+                      href={effectiveApplyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        color: '#1d4ed8',
+                        textDecoration: 'underline',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1
+                      }}
+                      title={effectiveApplyUrl}
+                    >
+                      {effectiveApplyUrl}
+                    </a>
+                  </div>
+                );
+              })()}
+
               <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <TrustBadge level={opp.status === 'VALIDATED' ? 'CONFIRMED' : 'INFERENCE'} />
@@ -469,36 +508,39 @@ export const OpportunityWorkspace: React.FC = () => {
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {opp.opportunityType === 'JOB_OPENING' && opp.supportingEvidenceIds && opp.supportingEvidenceIds.length > 0 && (
-                    <a
-                      href={opp.supportingEvidenceIds[0]}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        fontSize: '11px',
-                        color: '#4338ca',
-                        background: '#eef2ff',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid #c7d2fe',
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        transition: 'all 0.15s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#e0e7ff';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#eef2ff';
-                      }}
-                    >
-                      Apply ↗
-                    </a>
-                  )}
+                  {(() => {
+                    const effectiveApplyUrl = opp.applyUrl || (opp.supportingEvidenceIds && opp.supportingEvidenceIds.find(u => u.startsWith('http')));
+                    if (!effectiveApplyUrl) return null;
+                    return (
+                      <a
+                        href={effectiveApplyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          fontSize: '11px',
+                          color: '#ffffff',
+                          background: '#4338ca',
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                          fontWeight: 600,
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#3730a3';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#4338ca';
+                        }}
+                      >
+                        Apply on Job Board ↗
+                      </a>
+                    );
+                  })()}
                   <span style={{
                     fontSize: '11px',
                     color: opp.opportunityType === 'JOB_OPENING' ? '#4338ca' : '#64748b',

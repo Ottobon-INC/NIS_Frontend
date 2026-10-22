@@ -33,6 +33,7 @@ export interface Opportunity {
   lifecycleStatus?: string;
 
   // Detail fields
+  applyUrl?: string | null;
   description?: string | null;
   organizationId?: string;
   ownerUserId?: string | null;
@@ -41,10 +42,23 @@ export interface Opportunity {
   matchScore?: number | null;
   matchRationale?: string | null;
   supportingEvidenceIds?: string[];
+  scrapedJobs?: ScrapedJobSummary[];
   reviewNotes?: string | null;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
   validUntil?: string | null;
+}
+
+export interface ScrapedJobSummary {
+  id: string;
+  source: string;
+  externalId: string;
+  applyUrl: string;
+  canonicalApplyUrl?: string | null;
+  location?: string | null;
+  salary?: string | null;
+  status?: string | null;
+  publishedAt?: string | null;
 }
 
 export interface OpportunityCreatePayload {
