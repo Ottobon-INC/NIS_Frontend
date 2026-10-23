@@ -91,7 +91,7 @@ export const TrustedContextWorkspace: React.FC = () => {
       isEmpty={!isLoading && !isError && (!data?.items || data.items.length === 0)}
       emptyStateMessage="No trusted context has been established yet. Add a verified problem or requirement to form ground truth."
       primaryAction={{ label: '+ Add Context', onClick: () => { setActionError(null); setShowAddModal(true); } }}
-      secondaryAction={{ label: 'Return to Contact 360', onClick: () => navigate(`/people/${id}`) }}
+      secondaryActions={[{ label: 'Return to Contact 360', onClick: () => navigate(`/people/${id}`) }]}
     >
       {actionError && (
         <div style={{

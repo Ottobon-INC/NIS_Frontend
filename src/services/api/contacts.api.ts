@@ -169,8 +169,27 @@ export interface Contact360Data {
   
   // Commercial Intelligence Fields
   full_markdown_report?: string;
+  epistemicVerification?: {
+    identityStatus: string;
+    identityConfidence: number;
+    verifiedFactsCount: number;
+    signalsCount: number;
+    hypothesesCount: number;
+    quarantinedCount: number;
+  };
   commercialIntelligence?: {
     provenanceStatus: string;
+    identityResolutionStatus?: string;
+    verifiedFacts?: EpistemicFactItem[];
+    signalsContext?: EpistemicSignalItem[];
+    commercialHypotheses?: EpistemicHypothesisItem[];
+    conflictsAndQuarantined?: EpistemicQuarantinedItem[];
+    auditIssues?: Array<{
+      claim_id?: string;
+      issue_type: string;
+      message: string;
+      severity: string;
+    }>;
     domainName: string;
     provenDomainExpertise: string;
     isDomainSme: string;
@@ -208,6 +227,48 @@ export interface Contact360Data {
       excerpt?: string | null;
     }>;
   };
+}
+
+export interface EpistemicFactItem {
+  claimId?: string;
+  predicate?: string;
+  claim: string;
+  status: 'VERIFIED' | 'PARTIALLY_SUPPORTED' | string;
+  authorityTier?: string;
+  sourceUrl?: string;
+  quote?: string;
+  identityStatus?: string;
+}
+
+export interface EpistemicSignalItem {
+  claimId?: string;
+  predicate?: string;
+  claim: string;
+  status: 'PARTIALLY_SUPPORTED' | string;
+  authorityTier?: string;
+  sourceUrl?: string;
+  quote?: string;
+  observedDate?: string | null;
+  identityStatus?: string;
+}
+
+export interface EpistemicHypothesisItem {
+  hypothesis_id?: string;
+  trigger_claim_ids?: string[];
+  inferred_pain_point?: string;
+  ottobon_capability_offering?: string;
+  delivery_risk_assessment?: string;
+  estimated_effort_hours?: string;
+  pricing_scenario?: string;
+  epistemic_status?: string;
+}
+
+export interface EpistemicQuarantinedItem {
+  claimId?: string;
+  issueType?: string;
+  reason: string;
+  severity?: 'FATAL' | 'WARNING' | string;
+  status: 'QUARANTINED' | 'CONFLICTING' | string;
 }
 
 export interface OpportunityValidationData {

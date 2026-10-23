@@ -80,8 +80,21 @@ export const AddContact: React.FC = () => {
   // VIEW: Live Multi-Source Research Dashboard
   // -------------------------------------------------------------
   if (jobId) {
-    const isFinished = jobStatus?.status === 'COMPLETED' || jobStatus?.status === 'PARTIAL' || jobStatus?.status === 'FAILED';
+    const isFinished = jobStatus?.status === 'COMPLETED' || 
+                       jobStatus?.status === 'PARTIAL' || 
+                       jobStatus?.status === 'FAILED' ||
+                       (Boolean(jobStatus && jobStatus.total_tasks > 0 && 
+                        (jobStatus.pending_tasks === 0 || 
+                         (jobStatus.completed_tasks + jobStatus.failed_tasks >= jobStatus.total_tasks && (jobStatus.active_providers?.length ?? 0) === 0))));
     const resolvedContactId = contactId || jobStatus?.contact_id || jobId;
+
+    const totalTasks = jobStatus?.total_tasks || 8;
+    const completedTasks = jobStatus?.completed_tasks || 0;
+    const failedTasks = jobStatus?.failed_tasks || 0;
+    const finishedCount = completedTasks + failedTasks;
+    const progressPercent = isFinished 
+      ? 100 
+      : Math.min(95, Math.max(10, Math.round((finishedCount / (totalTasks || 1)) * 100)));
 
     return (
       <div style={{ maxWidth: '960px', margin: '2rem auto', padding: '0 var(--space-4)' }}>
@@ -103,11 +116,11 @@ export const AddContact: React.FC = () => {
                   fontWeight: 700,
                   padding: '3px 10px',
                   borderRadius: 'var(--radius-sm)',
-                  background: jobStatus?.status === 'COMPLETED' ? '#ECFDF5' : jobStatus?.status === 'FAILED' ? '#FEF2F2' : '#EEF2FF',
-                  color: jobStatus?.status === 'COMPLETED' ? '#047857' : jobStatus?.status === 'FAILED' ? '#DC2626' : '#4F46E5',
-                  border: `1px solid ${jobStatus?.status === 'COMPLETED' ? '#A7F3D0' : jobStatus?.status === 'FAILED' ? '#FECACA' : '#C7D2FE'}`
+                  background: isFinished ? '#ECFDF5' : jobStatus?.status === 'FAILED' ? '#FEF2F2' : '#EEF2FF',
+                  color: isFinished ? '#047857' : jobStatus?.status === 'FAILED' ? '#DC2626' : '#4F46E5',
+                  border: `1px solid ${isFinished ? '#A7F3D0' : jobStatus?.status === 'FAILED' ? '#FECACA' : '#C7D2FE'}`
                 }}>
-                  {jobStatus?.status || 'QUEUED'}
+                  {isFinished ? (jobStatus?.status === 'FAILED' ? 'FAILED' : 'COMPLETED') : (jobStatus?.status || 'RUNNING')}
                 </span>
               </div>
               <p style={{ margin: '4px 0 0 0', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
@@ -115,7 +128,7 @@ export const AddContact: React.FC = () => {
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap' }}>
               {jobStatus?.failed_tasks && jobStatus.failed_tasks > 0 && (
                 <button
                   type="button"
@@ -129,17 +142,118 @@ export const AddContact: React.FC = () => {
                 </button>
               )}
 
-              {isFinished && (
+              {!isFinished ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/people/${resolvedContactId}`)}
+                  className="btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    background: '#EEF2FF',
+                    color: '#4338CA',
+                    border: '1px solid #C7D2FE',
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(79, 70, 229, 0.1)'
+                  }}
+                  title="Live preview: You can preview Contact 360 with records gathered so far, or wait for full completion."
+                >
+                  <RefreshCw size={14} className="spin" color="#4F46E5" />
+                  <span>Researching... ({completedTasks}/{totalTasks} Complete)</span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: '#4F46E5',
+                    color: '#fff',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    marginLeft: '2px'
+                  }}>
+                    Preview 360 &rarr;
+                  </span>
+                </button>
+              ) : (
                 <button
                   type="button"
                   onClick={() => navigate(`/people/${resolvedContactId}`)}
                   className="btn btn-primary"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600 }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '13.5px',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                    color: '#fff',
+                    padding: '9px 18px',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                    cursor: 'pointer'
+                  }}
                 >
-                  <span>View Intelligence Report & 360 Workspace</span>
+                  <CheckCircle2 size={16} color="#A7F3D0" />
+                  <span>Open Contact 360 Dashboard</span>
                   <ArrowRight size={16} />
                 </button>
               )}
+            </div>
+          </div>
+
+          {/* Active Research Progress Bar */}
+          <div style={{
+            marginTop: 'var(--space-5)',
+            padding: '12px 16px',
+            background: isFinished ? '#F0FDF4' : '#F8FAFC',
+            borderRadius: 'var(--radius-md)',
+            border: `1px solid ${isFinished ? '#BBF7D0' : '#E2E8F0'}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {!isFinished ? (
+                  <>
+                    <RefreshCw size={13} className="spin" color="#4F46E5" />
+                    <span style={{ fontWeight: 600, color: '#1E293B' }}>
+                      Multi-Source Intelligence Gathering in Progress...
+                    </span>
+                    <span style={{ color: '#64748B' }}>
+                      ({completedTasks} of {totalTasks} providers completed)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={14} color="#059669" />
+                    <span style={{ fontWeight: 600, color: '#047857' }}>
+                      Research Complete
+                    </span>
+                    <span style={{ color: '#065F46' }}>
+                      • {jobStatus?.records_discovered ?? 0} Evidence record(s) extracted & epistemically verified
+                    </span>
+                  </>
+                )}
+              </div>
+              <div style={{ fontWeight: 700, color: isFinished ? '#047857' : '#4F46E5', fontVariantNumeric: 'tabular-nums' }}>
+                {isFinished ? '100%' : `${progressPercent}%`}
+              </div>
+            </div>
+
+            <div style={{ width: '100%', height: '6px', background: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
+              <div style={{
+                width: isFinished ? '100%' : `${progressPercent}%`,
+                height: '100%',
+                background: isFinished 
+                  ? 'linear-gradient(90deg, #10B981, #059669)' 
+                  : 'linear-gradient(90deg, #4F46E5, #6366F1)',
+                borderRadius: '999px',
+                transition: 'width 0.4s ease'
+              }} />
             </div>
           </div>
 

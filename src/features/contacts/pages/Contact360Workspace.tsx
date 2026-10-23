@@ -12,6 +12,9 @@ import {
   Target,
   Search,
   ShieldCheck,
+  ShieldAlert,
+  Lightbulb,
+  Info,
   Calendar,
   ChevronDown,
   ChevronUp,
@@ -219,10 +222,43 @@ export const Contact360Workspace: React.FC = () => {
   const pipelineStage = contact?.commercialIntelligence?.pipelineStage || 'PROPOSED';
   const sourcesCount = contact?.commercialIntelligence?.sourcesUsed?.length ?? 0;
 
+  const verifiedFacts = contact?.commercialIntelligence?.verifiedFacts || [];
+  const signalsContext = contact?.commercialIntelligence?.signalsContext || [];
+  const commercialHypotheses = contact?.commercialIntelligence?.commercialHypotheses || [];
+  const conflictsQuarantined = contact?.commercialIntelligence?.conflictsAndQuarantined || [];
+  const identityResStatus = contact?.commercialIntelligence?.identityResolutionStatus || (isGatePassed ? 'CONFIRMED' : 'AMBIGUOUS');
+
+  const isPlaceholderValue = (val?: string | null) => {
+    if (!val) return true;
+    const clean = val.trim().toLowerCase();
+    const placeholders = [
+      '[unverified]',
+      'unverified',
+      'unknown',
+      'pending research',
+      'none',
+      'n/a',
+      'na',
+      'unspecified',
+      'not specified',
+      'not provided',
+      'tbd',
+      'null',
+      'undefined'
+    ];
+    return placeholders.includes(clean);
+  };
+
   return (
     <WorkspaceShell
       title={contact ? contact.name : 'Loading Contact...'}
-      subtitle={contact ? `${contact.title} · ${contact.company}` : ''}
+      subtitle={
+        contact
+          ? `${contact.title || 'Executive'}${
+              !isPlaceholderValue(contact.company) ? ` · ${contact.company}` : ''
+            }`
+          : ''
+      }
       breadcrumbs={[
         { label: 'People', path: '/people' },
         { label: contact?.name || 'Contact 360', path: `/people/${id}` }
@@ -397,10 +433,19 @@ export const Contact360Workspace: React.FC = () => {
                     {contact.name}
                   </h1>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', color: '#64748B', fontSize: '13px' }}>
-                    <span style={{ fontWeight: 600, color: '#334155' }}>{contact.title || 'Unknown Title'}</span>
+                    <span style={{ fontWeight: 600, color: '#334155' }}>
+                      {!isPlaceholderValue(contact.title) ? contact.title : 'Professional'}
+                    </span>
                     <span>·</span>
-                    <span style={{ color: '#475569' }}>{contact.company || 'Pending Research'}</span>
-                    {contact.location && contact.location !== 'Unknown' && (
+                    <span
+                      style={{
+                        color: !isPlaceholderValue(contact.company) ? '#475569' : '#94A3B8',
+                        fontStyle: isPlaceholderValue(contact.company) ? 'italic' : 'normal'
+                      }}
+                    >
+                      {!isPlaceholderValue(contact.company) ? contact.company : 'Company Unverified'}
+                    </span>
+                    {contact.location && !isPlaceholderValue(contact.location) && (
                       <>
                         <span>·</span>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
@@ -414,25 +459,87 @@ export const Contact360Workspace: React.FC = () => {
 
               {/* Status / Gate Pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                {/* Identity Verification Pill */}
-                <span
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    background: isGatePassed ? '#ECFDF5' : '#FFFBEB',
-                    color: isGatePassed ? '#047857' : '#B45309',
-                    border: `1px solid ${isGatePassed ? '#A7F3D0' : '#FDE68A'}`,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                  title={identityGateReason || (isGatePassed ? 'Identity verified across evidence sources' : 'Pending verification')}
-                >
-                  {isGatePassed ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
-                  {isGatePassed ? `Verified Identity (${identityConfidence}%)` : `Identity Unverified`}
-                </span>
+                {/* Audited Identity Verification Pill */}
+                {identityResStatus === 'CONFIRMED' || identityConfidence >= 80 ? (
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      background: '#ECFDF5',
+                      color: '#047857',
+                      border: '1px solid #A7F3D0',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    title="Executive identity confirmed against authoritative profile anchors. (Deterministic match score: not a statistical probability)"
+                  >
+                    <CheckCircle2 size={13} />
+                    Identity Confirmed (Score: {identityConfidence}/100)
+                  </span>
+                ) : identityResStatus === 'PROBABLE' || identityConfidence >= 60 ? (
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      background: '#EFF6FF',
+                      color: '#1D4ED8',
+                      border: '1px solid #BFDBFE',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    title="Identity match is probable via web indexing; pending primary official confirmation. (Deterministic match score: not a statistical probability)"
+                  >
+                    <Info size={13} />
+                    Identity Probable (Score: {identityConfidence}/100)
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      background: '#FFFBEB',
+                      color: '#B45309',
+                      border: '1px solid #FDE68A',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    title={identityGateReason || 'Executive identity ambiguous across sources. Commercial scenarios suppressed.'}
+                  >
+                    <AlertTriangle size={13} />
+                    Identity Ambiguous (Score: {identityConfidence}/100)
+                  </span>
+                )}
+
+                {/* Career Provenance Verification Gate Pill */}
+                {!isGatePassed && (
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      background: '#FFFBEB',
+                      color: '#B45309',
+                      border: '1px solid #FDE68A',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    title={identityGateReason || 'Career history unverified. Commercial proposals withheld until verified employment history is retrieved.'}
+                  >
+                    <AlertTriangle size={13} />
+                    Career Details Unverified
+                  </span>
+                )}
 
                 {/* Network Tier Pill */}
                 <span
@@ -898,18 +1005,28 @@ export const Contact360Workspace: React.FC = () => {
                     </div>
                   </div>
 
-                  <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                      Estimated Scope &amp; Effort
+                  <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '8px', border: '1px dashed #CBD5E1' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                        Estimated Scope &amp; Effort
+                      </div>
+                      <span style={{ fontSize: '9px', fontWeight: 700, color: '#4F46E5', background: '#EEF2FF', padding: '1px 5px', borderRadius: '3px' }}>
+                        HYPOTHESIS
+                      </span>
                     </div>
                     <div style={{ fontSize: '13px', color: '#334155', marginTop: '6px' }}>
                       {contact.commercialIntelligence.estimatedEffortHours || 'Pending discovery interview'}
                     </div>
                   </div>
 
-                  <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                      Commercial Model
+                  <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '8px', border: '1px dashed #CBD5E1' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                        Commercial Model
+                      </div>
+                      <span style={{ fontSize: '9px', fontWeight: 700, color: '#4F46E5', background: '#EEF2FF', padding: '1px 5px', borderRadius: '3px' }}>
+                        HYPOTHESIS
+                      </span>
                     </div>
                     <div style={{ fontSize: '13px', color: '#334155', marginTop: '6px' }}>
                       {contact.commercialIntelligence.costPricingEstimate || 'Milestone Sprint / Scoped Engagement'}
@@ -990,6 +1107,454 @@ export const Contact360Workspace: React.FC = () => {
                   </div>
                 ) : (
                   <div style={{ fontSize: '13px', color: '#64748B' }}>No source queries recorded.</div>
+                )}
+              </div>
+
+              {/* ========================================================= */}
+              {/* 4-SECTION EPISTEMIC VERIFICATION DOSSIER */}
+              {/* ========================================================= */}
+
+              {/* SECTION 1: VERIFIED FACTS */}
+              <div
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ShieldCheck size={18} color="#059669" />
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
+                      Verified Background Facts
+                    </h3>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: '#ECFDF5',
+                      color: '#047857',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      border: '1px solid #A7F3D0'
+                    }}
+                  >
+                    {verifiedFacts.length} Verified
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '14px' }}>
+                  Claims verified against primary authoritative sources (e.g. direct LinkedIn profile or official company website) with confirmed executive identity.
+                </div>
+
+                {verifiedFacts.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {verifiedFacts.map((fact, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          background: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          borderLeft: '4px solid #10B981',
+                          borderRadius: '8px',
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+                            {fact.claim}
+                          </span>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                background: '#ECFDF5',
+                                color: '#047857',
+                                padding: '2px 6px',
+                                borderRadius: '4px'
+                              }}
+                            >
+                              VERIFIED
+                            </span>
+                            {fact.authorityTier && (
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: 600,
+                                  background: '#F1F5F9',
+                                  color: '#475569',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                {fact.authorityTier.replace('_', ' ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {fact.quote && fact.quote !== fact.claim && (
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              color: '#334155',
+                              fontStyle: 'italic',
+                              background: '#FFFFFF',
+                              padding: '6px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid #E2E8F0',
+                              marginTop: '2px'
+                            }}
+                          >
+                            &ldquo;{fact.quote}&rdquo;
+                          </div>
+                        )}
+
+                        {fact.sourceUrl && (
+                          <div style={{ fontSize: '11px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span>Source:</span>
+                            <span style={{ color: '#2563EB', wordBreak: 'break-all' }}>{fact.sourceUrl}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      background: '#F8FAFC',
+                      border: '1px dashed #CBD5E1',
+                      borderRadius: '8px',
+                      padding: '14px',
+                      fontSize: '12px',
+                      color: '#64748B'
+                    }}
+                  >
+                    No claims meet strict primary official verification criteria yet. Collected observations are retained below under <strong>Signals &amp; Observed Context</strong>.
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: SIGNALS & OBSERVED CONTEXT */}
+              <div
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Info size={18} color="#2563EB" />
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
+                      Signals &amp; Observed Context
+                    </h3>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: '#EFF6FF',
+                      color: '#1D4ED8',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      border: '1px solid #BFDBFE'
+                    }}
+                  >
+                    {signalsContext.length} Signals
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '14px' }}>
+                  Observations extracted from web search and media mentions. Provenance confirmed, but source authority is unverified web or identity match is probable.
+                </div>
+
+                {signalsContext.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {signalsContext.map((sig, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          background: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          borderLeft: '4px solid #3B82F6',
+                          borderRadius: '8px',
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B' }}>
+                            {sig.claim}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              background: '#EFF6FF',
+                              color: '#1D4ED8',
+                              padding: '2px 6px',
+                              borderRadius: '4px'
+                            }}
+                          >
+                            PARTIALLY SUPPORTED
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap', fontSize: '11px', color: '#64748B' }}>
+                          {sig.sourceUrl && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>Source:</span>
+                              <span style={{ color: '#475569' }}>{sig.sourceUrl}</span>
+                            </div>
+                          )}
+                          {sig.observedDate && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Calendar size={11} />
+                              <span>Observed: {sig.observedDate}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '12px', color: '#64748B', fontStyle: 'italic' }}>
+                    No secondary signals recorded.
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 3: COMMERCIAL HYPOTHESES */}
+              <div
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Lightbulb size={18} color="#6366F1" />
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
+                      Commercial Hypotheses
+                    </h3>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: '#EEF2FF',
+                      color: '#4F46E5',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      border: '1px solid #C7D2FE'
+                    }}
+                  >
+                    AI Sales Inferences
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '14px' }}>
+                  Inferred business challenges, Ottobon capability match, and commercial projections. Clearly demarcated as sales inferences, not confirmed client requirements.
+                </div>
+
+                {commercialHypotheses.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {commercialHypotheses.map((hyp, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          background: '#FAFAFE',
+                          border: '1px solid #E0E7FF',
+                          borderRadius: '8px',
+                          padding: '14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              background: '#EEF2FF',
+                              color: '#4338CA',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              letterSpacing: '0.02em'
+                            }}
+                          >
+                            HYPOTHESIS #{idx + 1}
+                          </span>
+                          {hyp.trigger_claim_ids && hyp.trigger_claim_ids.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '11px', color: '#64748B' }}>Motivated by Evidence:</span>
+                              {hyp.trigger_claim_ids.map(cid => (
+                                <span
+                                  key={cid}
+                                  style={{
+                                    fontFamily: 'monospace',
+                                    fontWeight: 700,
+                                    fontSize: '10px',
+                                    background: '#EFF6FF',
+                                    color: '#1D4ED8',
+                                    padding: '1px 5px',
+                                    borderRadius: '3px',
+                                    border: '1px solid #BFDBFE'
+                                  }}
+                                >
+                                  [{cid}]
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+                          <div>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase' }}>
+                              Inferred Pain Point
+                            </div>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B', marginTop: '2px' }}>
+                              {hyp.inferred_pain_point || 'Operational challenge'}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase' }}>
+                              Ottobon Capability Match
+                            </div>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B', marginTop: '2px' }}>
+                              {hyp.ottobon_capability_offering || 'Development'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', paddingTop: '8px', borderTop: '1px dashed #E2E8F0' }}>
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#64748B' }}>
+                              Effort Hypothesis: <strong style={{ color: '#334155' }}>{hyp.estimated_effort_hours || 'Pending Scoping'}</strong>
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#64748B' }}>
+                              Pricing Hypothesis: <strong style={{ color: '#334155' }}>{hyp.pricing_scenario || 'Indicative assumption'}</strong>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '12px', color: '#64748B', fontStyle: 'italic' }}>
+                    No commercial hypotheses generated.
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 4: CONFLICTS & QUARANTINED CLAIMS */}
+              <div
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ShieldAlert size={18} color="#DC2626" />
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
+                      Conflicts &amp; Quarantined Claims
+                    </h3>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: conflictsQuarantined.length > 0 ? '#FEF2F2' : '#F1F5F9',
+                      color: conflictsQuarantined.length > 0 ? '#991B1B' : '#64748B',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      border: `1px solid ${conflictsQuarantined.length > 0 ? '#FECACA' : '#E2E8F0'}`
+                    }}
+                  >
+                    {conflictsQuarantined.length} Flagged
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '14px' }}>
+                  Contradictory claims, unverified quotes, ambiguous identities, or stale career states. Strictly withheld from verified background facts.
+                </div>
+
+                {conflictsQuarantined.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {conflictsQuarantined.map((item, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          background: '#FFF8F8',
+                          border: '1px solid #FEE2E2',
+                          borderLeft: '4px solid #EF4444',
+                          borderRadius: '8px',
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              background: '#FEE2E2',
+                              color: '#991B1B',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            {item.issueType?.replace(/_/g, ' ') || 'QUARANTINED CLAIM'}
+                          </span>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#DC2626' }}>
+                            {item.status}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#450A0A', marginTop: '2px' }}>
+                          {item.reason}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      background: '#F0FDF4',
+                      border: '1px solid #BBF7D0',
+                      borderRadius: '8px',
+                      padding: '12px 14px',
+                      fontSize: '12px',
+                      color: '#166534',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <CheckCircle2 size={15} color="#16a34a" />
+                    <span>No conflicting or quarantined claims detected across research sources.</span>
+                  </div>
                 )}
               </div>
 

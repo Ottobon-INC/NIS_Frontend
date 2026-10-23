@@ -21,24 +21,42 @@ export const CompanyIntelligenceCard: React.FC<CompanyIntelligenceCardProps> = (
   const isPlaceholderName = (name?: string) => {
     if (!name) return true;
     const clean = name.trim().toLowerCase();
-    return clean === '[unverified]' || clean === 'unverified' || clean === 'unknown' || clean === 'pending research' || clean === 'none' || clean === 'n/a';
+    const placeholders = [
+      '[unverified]',
+      'unverified',
+      'unknown',
+      'pending research',
+      'none',
+      'n/a',
+      'na',
+      'unspecified',
+      'not specified',
+      'not provided',
+      'tbd',
+      'null',
+      'undefined'
+    ];
+    return placeholders.includes(clean);
   };
 
   const isInitialUnverified = isPlaceholderName(companyName);
   const [isEditingName, setIsEditingName] = useState(isInitialUnverified);
   const [inputCompanyName, setInputCompanyName] = useState(isInitialUnverified ? '' : companyName);
 
+  const [hasAutoTriggered, setHasAutoTriggered] = useState(false);
+
   useEffect(() => {
     if (!isPlaceholderName(companyName)) {
       setInputCompanyName(companyName);
-      if (!isEditingName) {
-        setIsEditingName(false);
-      }
+      setIsEditingName(false);
+    } else {
+      setInputCompanyName('');
+      setIsEditingName(true);
     }
   }, [companyName]);
 
   // 1. Fetch persisted company intelligence from DB
-  const { data: intel } = useQuery<CompanyIntelligenceData | null>({
+  const { data: intel, isLoading: isIntelLoading } = useQuery<CompanyIntelligenceData | null>({
     queryKey: ['companyIntelligence', contactId],
     queryFn: async () => {
       try {
@@ -56,6 +74,14 @@ export const CompanyIntelligenceCard: React.FC<CompanyIntelligenceCardProps> = (
     },
     retry: false
   });
+
+  // Auto-trigger extraction if company is verified but no intelligence in DB yet
+  useEffect(() => {
+    if (!isIntelLoading && intel === null && !isPlaceholderName(companyName) && !hasAutoTriggered) {
+      setHasAutoTriggered(true);
+      extractMutation.mutate(companyName);
+    }
+  }, [intel, isIntelLoading, companyName, hasAutoTriggered]);
 
   // 2. Mutation to extract & store in DB
   const extractMutation = useMutation({
@@ -81,8 +107,8 @@ export const CompanyIntelligenceCard: React.FC<CompanyIntelligenceCardProps> = (
   const handleExtract = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const target = inputCompanyName.trim() || (!isPlaceholderName(companyName) ? companyName : '');
-    if (!target) {
-      alert('Please enter a company name (e.g. "Ottobon") to extract intelligence.');
+    if (!target || isPlaceholderName(target)) {
+      alert('Please enter a valid company name (e.g. "Google", "AWS") to extract intelligence.');
       return;
     }
     extractMutation.mutate(target);
