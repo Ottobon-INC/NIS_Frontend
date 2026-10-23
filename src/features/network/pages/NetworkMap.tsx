@@ -2,11 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { networkApi } from '../../../services/api/network.api';
+import { NetworkGraphCanvas } from '../components/NetworkGraphCanvas';
 
 export const NetworkMap: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [researchingId, setResearchingId] = useState<string | null>(null);
+  const [viewStyle, setViewStyle] = useState<'canvas' | 'grid'>('grid');
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['networkGraph'],
@@ -23,7 +25,9 @@ export const NetworkMap: React.FC = () => {
   const filteredNodes = useMemo(() => {
     return nodes.filter(n => {
       const matchesType = filterType === 'ALL' || n.type === filterType;
-      const matchesSearch = !searchTerm || n.label.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = !searchTerm || 
+        n.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (Boolean(n.company) && (n.company as string).toLowerCase().includes(searchTerm.toLowerCase()));
       return matchesType && matchesSearch;
     });
   }, [nodes, filterType, searchTerm]);
@@ -118,13 +122,13 @@ export const NetworkMap: React.FC = () => {
           overflow: 'hidden'
         }}>
           {/* Controls Bar */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#fff', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#fff', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
             <input 
               type="text"
               placeholder="Search person or company across all connections..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px' }}
+              style={{ flex: 1, minWidth: '180px', border: 'none', outline: 'none', fontSize: '13px' }}
             />
             <div style={{ display: 'flex', gap: '6px' }}>
               {(['ALL', 'PERSON', 'COMPANY'] as const).map(t => (
@@ -146,72 +150,137 @@ export const NetworkMap: React.FC = () => {
                 </button>
               ))}
             </div>
+            <div style={{ display: 'flex', gap: '4px', borderLeft: '1px solid var(--color-border)', paddingLeft: '8px' }}>
+              <button
+                onClick={() => setViewStyle('canvas')}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: viewStyle === 'canvas' ? '#4F46E5' : '#F1F5F9',
+                  color: viewStyle === 'canvas' ? '#fff' : '#64748B'
+                }}
+              >
+                🕸️ Graph Canvas
+              </button>
+              <button
+                onClick={() => setViewStyle('grid')}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: viewStyle === 'grid' ? '#4F46E5' : '#F1F5F9',
+                  color: viewStyle === 'grid' ? '#fff' : '#64748B'
+                }}
+              >
+                📋 Grid
+              </button>
+            </div>
           </div>
 
-          {/* Nodes Interactive Cluster */}
-          <div style={{ 
-            flex: 1, 
-            overflowY: 'auto', 
-            padding: '12px', 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', 
-            gap: '12px',
-            alignContent: 'start'
-          }}>
-            {filteredNodes.map(node => {
-              const isSelected = selectedNode?.id === node.id;
-              const isBhanu = node.id === 'bhanu-root';
-              const isCompany = node.type === 'COMPANY';
+          {/* Canvas or Grid View */}
+          {viewStyle === 'canvas' ? (
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', borderRadius: '10px', border: '1px solid var(--color-border)', minHeight: 0 }}>
+              <NetworkGraphCanvas
+                nodes={filteredNodes}
+                edges={edges}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={(nodeId) => setSelectedNodeId(nodeId)}
+                height="100%"
+              />
+            </div>
+          ) : (
+            <div style={{ 
+              flex: 1, 
+              overflowY: 'auto', 
+              padding: '12px', 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', 
+              gap: '12px',
+              alignContent: 'start'
+            }}>
+              {filteredNodes.map(node => {
+                const isSelected = selectedNode?.id === node.id;
+                const isBhanu = node.id === 'bhanu-root';
+                const isCompany = node.type === 'COMPANY';
 
-              return (
-                <div
-                  key={node.id}
-                  onClick={() => setSelectedNodeId(node.id)}
-                  style={{
-                    padding: '14px',
-                    background: isBhanu ? '#4F46E5' : isSelected ? '#EFF6FF' : '#fff',
-                    color: isBhanu ? '#fff' : '#1E293B',
-                    border: isSelected ? '2px solid #3B82F6' : '1px solid var(--color-border)',
-                    borderRadius: isCompany ? '10px' : '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    boxShadow: isSelected ? '0 4px 12px rgba(59,130,246,0.15)' : '0 1px 3px rgba(0,0,0,0.03)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ 
-                      fontSize: '10px', 
-                      fontWeight: 700, 
-                      letterSpacing: '0.5px',
-                      color: isBhanu ? 'rgba(255,255,255,0.8)' : isCompany ? '#059669' : '#6366F1' 
-                    }}>
-                      {isBhanu ? 'FOUNDER' : node.type}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {node.hasResearch && (
-                        <span style={{ fontSize: '9px', fontWeight: 700, background: '#DCFCE7', color: '#15803D', padding: '1px 5px', borderRadius: '4px' }}>
-                          RESEARCHED
-                        </span>
+                return (
+                  <div
+                    key={node.id}
+                    onClick={() => setSelectedNodeId(node.id)}
+                    style={{
+                      padding: '14px',
+                      background: isBhanu ? '#4F46E5' : isSelected ? '#EFF6FF' : '#fff',
+                      color: isBhanu ? '#fff' : '#1E293B',
+                      border: isSelected ? '2px solid #3B82F6' : '1px solid var(--color-border)',
+                      borderRadius: isCompany ? '10px' : '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: isSelected ? '0 4px 12px rgba(59,130,246,0.15)' : '0 1px 3px rgba(0,0,0,0.03)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ 
+                        fontSize: '10px', 
+                        fontWeight: 700, 
+                        letterSpacing: '0.5px',
+                        color: isBhanu ? 'rgba(255,255,255,0.85)' : isCompany ? '#0284C7' : '#4F46E5' 
+                      }}>
+                        {isBhanu ? 'FOUNDER' : node.type}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {node.hasResearch && (
+                          <span style={{ fontSize: '9px', fontWeight: 700, background: '#DCFCE7', color: '#15803D', padding: '1px 5px', borderRadius: '4px' }}>
+                            RESEARCHED
+                          </span>
+                        )}
+                        {isCompany && <span style={{ fontSize: '14px' }}>🏢</span>}
+                        {!isCompany && !isBhanu && <span style={{ fontSize: '14px' }}>👤</span>}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: isBhanu ? '#fff' : '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {node.label}
+                      </div>
+                      {node.role && !isCompany && (
+                        <div style={{ fontSize: '12px', color: isBhanu ? 'rgba(255,255,255,0.8)' : '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
+                          {node.role}
+                        </div>
                       )}
-                      {isCompany && <span style={{ fontSize: '14px' }}>🏢</span>}
-                      {!isCompany && !isBhanu && <span style={{ fontSize: '14px' }}>👤</span>}
                     </div>
+                    {node.company && (
+                      <div style={{ 
+                        fontSize: '12px', 
+                        fontWeight: 500,
+                        color: isBhanu ? 'rgba(255,255,255,0.9)' : '#1E293B', 
+                        background: isBhanu ? 'rgba(255,255,255,0.15)' : '#F1F5F9',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis', 
+                        whiteSpace: 'nowrap' 
+                      }}>
+                        <span style={{ flexShrink: 0 }}>🏢</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.company}</span>
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {node.label}
-                  </div>
-                  {node.company && (
-                    <div style={{ fontSize: '12px', color: isBhanu ? 'rgba(255,255,255,0.7)' : '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {node.company}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Right: Relationship & Node Inspector */}
@@ -236,7 +305,7 @@ export const NetworkMap: React.FC = () => {
                   width: '46px',
                   height: '46px',
                   borderRadius: selectedNode.type === 'COMPANY' ? '8px' : '50%',
-                  background: selectedNode.id === 'bhanu-root' ? '#4F46E5' : selectedNode.type === 'COMPANY' ? '#10B981' : '#6366F1',
+                  background: selectedNode.id === 'bhanu-root' ? '#4F46E5' : selectedNode.type === 'COMPANY' ? '#0284C7' : '#6366F1',
                   color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
@@ -389,6 +458,11 @@ export const NetworkMap: React.FC = () => {
                           <div style={{ fontWeight: 600, color: '#1E293B' }}>
                             {otherNode?.label || otherNodeId}
                           </div>
+                          {otherNode?.company && (
+                            <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              🏢 {otherNode.company}
+                            </div>
+                          )}
                           <div style={{ fontSize: '12px', color: '#6366F1', fontWeight: 500 }}>
                             🔗 {e.label}
                           </div>

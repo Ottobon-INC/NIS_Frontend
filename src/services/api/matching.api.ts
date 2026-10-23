@@ -52,6 +52,7 @@ export interface SemanticProductMatchResponse {
   validation_questions?: string[];
   recommended_next_step?: string;
   capability_gap?: string;
+  proposed_solution?: string;
 }
 
 export const matchingApi = {

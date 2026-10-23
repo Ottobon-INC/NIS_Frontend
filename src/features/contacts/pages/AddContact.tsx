@@ -1,14 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { contactsApi, type ResearchJobStatus, type SourceItem } from '../../../services/api/contacts.api';
-import { Globe, BookOpen, Building2, Newspaper, Search, RefreshCw, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
-
-const GithubIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = '#24292F' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={color} style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-    <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-  </svg>
-);
+import { contactsApi, type ResearchJobStatus } from '../../../services/api/contacts.api';
+import { RefreshCw, AlertCircle, ArrowRight, Search } from 'lucide-react';
 
 export const AddContact: React.FC = () => {
   const navigate = useNavigate();
@@ -39,22 +33,11 @@ export const AddContact: React.FC = () => {
     }
   });
 
-  // 2. Discovered Sources Query (active when job running or complete)
-  const { data: sourcesData } = useQuery<{ job_id: string; total_sources: number; sources: SourceItem[] }>({
-    queryKey: ['researchJobSources', jobId],
-    queryFn: () => contactsApi.getSources(jobId!),
-    enabled: !!jobId,
-    refetchInterval: () => {
-      return (jobStatus?.status === 'COMPLETED' || jobStatus?.status === 'FAILED' || jobStatus?.status === 'PARTIAL') ? false : 2000;
-    }
-  });
-
   // Retry Mutation
   const retryMutation = useMutation({
     mutationFn: () => contactsApi.retryJob(jobId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['researchJobStatus', jobId] });
-      queryClient.invalidateQueries({ queryKey: ['researchJobSources', jobId] });
     }
   });
 
@@ -65,19 +48,19 @@ export const AddContact: React.FC = () => {
     }
   };
 
-  const getSourceIcon = (sourceId: string) => {
-    switch (sourceId) {
-      case 'github': return <GithubIcon size={18} color="#24292F" />;
-      case 'academic_openalex': return <BookOpen size={18} color="#2563EB" />;
-      case 'company_web': return <Building2 size={18} color="#4F46E5" />;
-      case 'news_public': return <Newspaper size={18} color="#059669" />;
-      case 'duckduckgo': return <Search size={18} color="#EA580C" />;
-      default: return <Globe size={18} color="#64748B" />;
+  // Automatically navigate directly to the next step (Contact 360 Workspace) once research completes
+  React.useEffect(() => {
+    if (jobId && jobStatus) {
+      const isDone = jobStatus.status === 'COMPLETED' || jobStatus.status === 'PARTIAL';
+      if (isDone) {
+        const targetId = contactId || jobStatus.contact_id || jobId;
+        navigate(`/people/${targetId}`, { replace: true });
+      }
     }
-  };
+  }, [jobId, jobStatus, contactId, navigate]);
 
   // -------------------------------------------------------------
-  // VIEW: Live Multi-Source Research Dashboard
+  // VIEW: Clean Loading State (Hides raw provider grid, transitions directly)
   // -------------------------------------------------------------
   if (jobId) {
     const isFinished = jobStatus?.status === 'COMPLETED' || 
@@ -87,6 +70,9 @@ export const AddContact: React.FC = () => {
                         (jobStatus.pending_tasks === 0 || 
                          (jobStatus.completed_tasks + jobStatus.failed_tasks >= jobStatus.total_tasks && (jobStatus.active_providers?.length ?? 0) === 0))));
     const resolvedContactId = contactId || jobStatus?.contact_id || jobId;
+    const progressPercent = jobStatus?.total_tasks 
+      ? Math.round(((jobStatus.completed_tasks || 0) / jobStatus.total_tasks) * 100)
+      : 15;
 
     const totalTasks = jobStatus?.total_tasks || 8;
     const completedTasks = jobStatus?.completed_tasks || 0;
@@ -295,126 +281,135 @@ export const AddContact: React.FC = () => {
             </div>
           </div>
         </div>
+      );
+    }
 
-        {/* Live Providers Grid */}
-        <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 var(--space-4) 0' }}>Research Providers Status</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-7)' }}>
-          {jobStatus?.tasks && jobStatus.tasks.length > 0 ? (
-            jobStatus.tasks.map(t => {
-              const isRunning = t.status === 'RUNNING' || t.status === 'PENDING';
-              const isSuccess = t.status === 'COMPLETED';
-              const isFailed = t.status === 'FAILED';
-
-              return (
-                <div key={t.task_id} style={{
-                  background: '#fff',
-                  borderRadius: 'var(--radius-md)',
-                  border: `1px solid ${isFailed ? '#FECACA' : isSuccess ? '#D1FAE5' : 'var(--color-border)'}`,
-                  padding: 'var(--space-4)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {getSourceIcon(t.source_id)}
-                      <span style={{ fontWeight: 600, fontSize: '14px', color: '#0F172A' }}>{t.source_name}</span>
-                    </div>
-                    {isSuccess && <CheckCircle2 size={16} color="#059669" />}
-                    {isFailed && <AlertCircle size={16} color="#DC2626" />}
-                    {isRunning && <RefreshCw size={16} color="#4F46E5" className="spin" />}
-                  </div>
-
-                  <div style={{ fontSize: '12px', color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    Query: <span style={{ fontFamily: 'monospace', color: '#334155' }}>{t.target_query || t.source_id}</span>
-                  </div>
-
-                  {t.error ? (
-                    <div style={{ fontSize: '11px', color: '#DC2626', background: '#FEF2F2', padding: '4px 8px', borderRadius: '4px' }}>
-                      {t.error}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '11px', color: isSuccess ? '#059669' : '#64748B', fontWeight: 500 }}>
-                      {isSuccess ? 'Extraction completed' : isRunning ? 'Retrieving live records...' : 'Queued'}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          ) : (
-            <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: '#64748B', background: '#fff', borderRadius: 'var(--radius-md)', gridColumn: '1 / -1' }}>
-              Initializing discovery queries and enqueuing providers...
-            </div>
-          )}
-        </div>
-
-        {/* Live Discovered Sources Feed */}
-        {sourcesData && sourcesData.sources && sourcesData.sources.length > 0 && (
+    return (
+      <div style={{ maxWidth: '560px', margin: '5rem auto', padding: '0 var(--space-4)' }}>
+        <div style={{
+          background: '#fff',
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid var(--color-border)',
+          padding: 'var(--space-9) var(--space-7)',
+          textAlign: 'center',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.05)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Subtle animated gradient top accent bar */}
           <div style={{
-            background: '#fff',
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid var(--color-border)',
-            padding: 'var(--space-6)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-          }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 var(--space-4) 0' }}>
-              Discovered Records & Evidence Sources ({sourcesData.total_sources})
-            </h2>
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'linear-gradient(90deg, #3B82F6, #6366F1, #8B5CF6, #3B82F6)',
+            backgroundSize: '200% 100%',
+            animation: 'gradientShift 2s linear infinite'
+          }} />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {sourcesData.sources.map((s, idx) => (
-                <div key={idx} style={{
-                  padding: '12px',
-                  background: '#F8FAFC',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid #E2E8F0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {getSourceIcon(s.source_id)}
-                      <span style={{ fontWeight: 600, fontSize: '13px', color: '#0F172A' }}>{s.source_name}</span>
-                      {s.identity_match_status && (
-                        <span style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          background: s.identity_match_status === 'CONFIRMED' ? '#ECFDF5' : '#FFFBEB',
-                          color: s.identity_match_status === 'CONFIRMED' ? '#047857' : '#B45309'
-                        }}>
-                          {s.identity_match_status} ({s.identity_match_confidence}%)
-                        </span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '11px', color: '#64748B' }}>
-                      {s.records_count} record(s) found
-                    </span>
-                  </div>
-
-                  {s.reference && (
-                    <a
-                      href={s.reference}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: '12px', color: '#2563EB', textDecoration: 'none', wordBreak: 'break-all' }}
-                    >
-                      {s.reference}
-                    </a>
-                  )}
-
-                  {s.snippet && (
-                    <p style={{ margin: 0, fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
-                      {s.snippet}
-                    </p>
-                  )}
-                </div>
-              ))}
+          {/* Premium animated loading icon */}
+          <div style={{ position: 'relative', width: '84px', height: '84px', margin: '0 auto var(--space-6)' }}>
+            <div style={{
+              position: 'absolute',
+              inset: '-4px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, rgba(99, 102, 241, 0) 70%)',
+              animation: 'pulseGlow 2s ease-in-out infinite'
+            }} />
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)',
+              border: '1px solid #C7D2FE',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-brand-primary)'
+            }}>
+              <RefreshCw size={36} className="spin" style={{ animationDuration: '1.2s' }} />
             </div>
           </div>
-        )}
+
+          <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', margin: '0 0 var(--space-2) 0', letterSpacing: '-0.02em' }}>
+            Gathering Intelligence...
+          </h2>
+
+          <p style={{ fontSize: '14px', color: '#64748B', lineHeight: '1.6', margin: '0 0 var(--space-6) 0' }}>
+            Analyzing candidate credentials, verifying public affiliations, and grounding commercial product opportunities.
+          </p>
+
+          {/* Modern Progress Bar */}
+          <div style={{
+            width: '100%',
+            height: '8px',
+            background: '#F1F5F9',
+            borderRadius: '999px',
+            overflow: 'hidden',
+            marginBottom: 'var(--space-4)'
+          }}>
+            <div style={{
+              height: '100%',
+              width: `${Math.max(progressPercent, 20)}%`,
+              background: 'linear-gradient(90deg, #3B82F6 0%, #6366F1 100%)',
+              borderRadius: '999px',
+              transition: 'width 0.5s ease-in-out'
+            }} />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#94A3B8', marginBottom: 'var(--space-6)' }}>
+            <span>
+              {jobStatus?.completed_tasks && jobStatus?.total_tasks
+                ? `${jobStatus.completed_tasks} of ${jobStatus.total_tasks} sources analyzed`
+                : 'Connecting intelligence providers...'}
+            </span>
+            <span style={{ fontWeight: 600, color: '#64748B' }}>
+              {progressPercent}%
+            </span>
+          </div>
+
+          {/* Target URL indicator badge */}
+          <div style={{
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: 'var(--radius-md)',
+            padding: '10px 14px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '12px',
+            color: '#475569',
+            maxWidth: '100%'
+          }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: '#3B82F6',
+              boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.2)'
+            }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Target: <strong style={{ color: '#1E293B' }}>{url || 'LinkedIn Profile'}</strong>
+            </span>
+          </div>
+
+          <p style={{ fontSize: '12px', color: '#94A3B8', margin: 'var(--space-5) 0 0 0' }}>
+            Directly loading 360 Workspace upon completion...
+          </p>
+
+          <style>{`
+            @keyframes pulseGlow {
+              0%, 100% { transform: scale(1); opacity: 0.6; }
+              50% { transform: scale(1.15); opacity: 0.9; }
+            }
+            @keyframes gradientShift {
+              0% { background-position: 0% 50%; }
+              100% { background-position: 200% 50%; }
+            }
+          `}</style>
+        </div>
       </div>
     );
   }
