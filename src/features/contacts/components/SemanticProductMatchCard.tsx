@@ -104,6 +104,7 @@ export const isProblemVerified = (problem?: string | null): boolean => {
     'unverified',
     'not verified',
     'no explicit problem',
+    'no observed problem',
     'pending research',
     'unknown',
     'none',
@@ -118,7 +119,10 @@ export const isProblemVerified = (problem?: string | null): boolean => {
     'no bounded problem',
     'analyzing dossier',
     'awaiting research',
-    'insufficient evidence'
+    'insufficient evidence',
+    'conflicting evidence',
+    'hypothesis only',
+    'unverified hypothesis'
   ];
   if (unverifiedKeywords.some(kw => p.includes(kw))) {
     return false;
