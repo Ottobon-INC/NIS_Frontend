@@ -17,8 +17,8 @@ import {
   Info,
   Calendar,
   ChevronDown,
-  ChevronUp,
-  Download
+  Download,
+  Activity
 } from 'lucide-react';
 
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
@@ -27,6 +27,7 @@ import { useUIStore } from '../../../store/uiStore';
 import { contactsApi } from '../../../services/api/contacts.api';
 import { CompanyIntelligenceCard } from '../components/CompanyIntelligenceCard';
 import { SemanticProductMatchCard } from '../components/SemanticProductMatchCard';
+import { IdentityAuditModal } from '../components/IdentityAuditModal';
 import { matchingApi, type SemanticProductMatchResponse } from '../../../services/api/matching.api';
 
 type TabKey = 'overview' | 'commercial' | 'evidence';
@@ -49,6 +50,7 @@ export const Contact360Workspace: React.FC = () => {
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDeclining, setIsDeclining] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showIdentityAuditModal, setShowIdentityAuditModal] = useState(false);
   const [targetStatus, setTargetStatus] = useState<string>('');
   const [reviewNotes, setReviewNotes] = useState('');
 
@@ -459,9 +461,11 @@ export const Contact360Workspace: React.FC = () => {
 
               {/* Status / Gate Pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                {/* Audited Identity Verification Pill */}
+                {/* Audited Identity Verification Pill (Clickable for Diagnostics & Audit) */}
                 {identityResStatus === 'CONFIRMED' || identityConfidence >= 80 ? (
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => setShowIdentityAuditModal(true)}
                     style={{
                       fontSize: '12px',
                       fontWeight: 600,
@@ -472,15 +476,20 @@ export const Contact360Workspace: React.FC = () => {
                       border: '1px solid #A7F3D0',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '5px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
                     }}
-                    title="Executive identity confirmed against authoritative profile anchors. (Deterministic match score: not a statistical probability)"
+                    title="Click to view complete identity breakdown & provider diagnostics"
                   >
                     <CheckCircle2 size={13} />
                     Identity Confirmed (Score: {identityConfidence}/100)
-                  </span>
+                    <Activity size={12} style={{ marginLeft: '3px', opacity: 0.7 }} />
+                  </button>
                 ) : identityResStatus === 'PROBABLE' || identityConfidence >= 60 ? (
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => setShowIdentityAuditModal(true)}
                     style={{
                       fontSize: '12px',
                       fontWeight: 600,
@@ -491,15 +500,20 @@ export const Contact360Workspace: React.FC = () => {
                       border: '1px solid #BFDBFE',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '5px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
                     }}
-                    title="Identity match is probable via web indexing; pending primary official confirmation. (Deterministic match score: not a statistical probability)"
+                    title="Click to view identity breakdown & troubleshoot missing anchors"
                   >
                     <Info size={13} />
                     Identity Probable (Score: {identityConfidence}/100)
-                  </span>
+                    <Activity size={12} style={{ marginLeft: '3px', opacity: 0.7 }} />
+                  </button>
                 ) : (
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => setShowIdentityAuditModal(true)}
                     style={{
                       fontSize: '12px',
                       fontWeight: 600,
@@ -510,13 +524,16 @@ export const Contact360Workspace: React.FC = () => {
                       border: '1px solid #FDE68A',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '5px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
                     }}
-                    title={identityGateReason || 'Executive identity ambiguous across sources. Commercial scenarios suppressed.'}
+                    title="Click to view why identity is ambiguous and troubleshoot provider logs"
                   >
                     <AlertTriangle size={13} />
                     Identity Ambiguous (Score: {identityConfidence}/100)
-                  </span>
+                    <Activity size={12} style={{ marginLeft: '3px', opacity: 0.7 }} />
+                  </button>
                 )}
 
                 {/* Career Provenance Verification Gate Pill */}
@@ -1895,6 +1912,17 @@ export const Contact360Workspace: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Audited Identity & Research Troubleshooting Modal */}
+      {contact && (
+        <IdentityAuditModal
+          contactId={id || ''}
+          contactName={contact.name}
+          auditData={contact.identityAudit}
+          isOpen={showIdentityAuditModal}
+          onClose={() => setShowIdentityAuditModal(false)}
+        />
       )}
     </WorkspaceShell>
   );

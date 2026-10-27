@@ -169,6 +169,7 @@ export interface Contact360Data {
   
   // Commercial Intelligence Fields
   full_markdown_report?: string;
+  identityAudit?: IdentityAuditData;
   epistemicVerification?: {
     identityStatus: string;
     identityConfidence: number;
@@ -269,6 +270,37 @@ export interface EpistemicQuarantinedItem {
   reason: string;
   severity?: 'FATAL' | 'WARNING' | string;
   status: 'QUARANTINED' | 'CONFLICTING' | string;
+}
+
+export interface ConfidenceScoreFactor {
+  name: string;
+  weight: number;
+  earned: number;
+  status: 'MATCHED' | 'PARTIAL' | 'UNVERIFIED' | 'MISSING' | 'NEUTRAL' | string;
+  description: string;
+}
+
+export interface ProviderDiagnosticTask {
+  taskId: string;
+  sourceId: string;
+  status: string;
+  query?: string;
+  errorMessage?: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
+export interface IdentityAuditData {
+  score: number;
+  status: string;
+  isGatePassed: boolean;
+  gateReason?: string | null;
+  factors: ConfidenceScoreFactor[];
+  providerDiagnostics: ProviderDiagnosticTask[];
+  detectedConflicts: string[];
+  quarantinedCount: number;
+  auditIssues: Array<{ claim_id?: string; issue_type?: string; message?: string; severity?: string }>;
+  resolutionNotes?: string;
 }
 
 export interface OpportunityValidationData {

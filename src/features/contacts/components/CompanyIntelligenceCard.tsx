@@ -403,9 +403,9 @@ export const CompanyIntelligenceCard: React.FC<CompanyIntelligenceCardProps> = (
                   What They Do
                 </h3>
               </div>
-              <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5, color: '#1E293B' }}>
+              <div style={{ margin: 0, fontSize: '13px', lineHeight: 1.6, color: '#1E293B', whiteSpace: 'pre-line' }}>
                 {intel.overview || 'Detailed overview pending analysis.'}
-              </p>
+              </div>
             </div>
 
             {/* 2. What they have implemented */}
@@ -424,7 +424,7 @@ export const CompanyIntelligenceCard: React.FC<CompanyIntelligenceCardProps> = (
                   What They Have Implemented
                 </h3>
               </div>
-              <div style={{ margin: 0, fontSize: '13px', lineHeight: 1.5, color: '#1E293B' }}>
+              <div style={{ margin: 0, fontSize: '13px', lineHeight: 1.6, color: '#1E293B', whiteSpace: 'pre-line' }}>
                 {intel.what_they_implemented || 'Architecture and platform modernizations pending analysis.'}
               </div>
 
