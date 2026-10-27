@@ -1,21 +1,39 @@
 :root {
   /* Colors */
   --color-bg-primary: #F8FAFC;
-  --color-bg-sidebar: #0F172A;
+  --color-bg-sidebar: #0B132B;
+  --color-bg-sidebar-hover: #1C2541;
   --color-bg-surface: #FFFFFF;
-  --color-bg-surface-hover: #F1F5F9;
+  --color-bg-surface-hover: #F8FAFC;
   
   --color-text-primary: #0F172A;
-  --color-text-secondary: #475569;
-  --color-text-sidebar: #CBD5E1;
+  --color-text-secondary: #64748B;
+  --color-text-muted: #94A3B8;
+  --color-text-sidebar: #94A3B8;
   --color-text-sidebar-hover: #FFFFFF;
   
   --color-border: #E2E8F0;
-  --color-border-focus: #94A3B8;
+  --color-border-subtle: #F1F5F9;
+  --color-border-focus: #3B82F6;
 
   --color-brand-primary: #2563EB;
   --color-brand-primary-hover: #1D4ED8;
+  --color-brand-light: #EFF6FF;
   
+  /* Status Badges */
+  --badge-green-bg: #DCFCE7;
+  --badge-green-text: #15803D;
+  --badge-blue-bg: #DBEAFE;
+  --badge-blue-text: #1D4ED8;
+  --badge-amber-bg: #FEF3C7;
+  --badge-amber-text: #B45309;
+  --badge-red-bg: #FEE2E2;
+  --badge-red-text: #B91C1C;
+  --badge-purple-bg: #F3E8FF;
+  --badge-purple-text: #7E22CE;
+  --badge-gray-bg: #F1F5F9;
+  --badge-gray-text: #475569;
+
   /* Trust System Status Colors */
   --color-fact: #10B981;
   --color-signal: #3B82F6;
@@ -49,18 +67,25 @@
   --space-9: 48px;
 
   /* Border Radius */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-drawer: -10px 0 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+  --shadow-drawer: -10px 0 25px -3px rgb(0 0 0 / 0.15);
 
   /* Layout Constraints */
-  --sidebar-width: 240px;
-  --topbar-height: 64px;
+  --sidebar-width: 220px;
+  --topbar-height: 56px;
+  --content-max-width: 1440px;
+  --content-padding-x: 32px;
+  --input-height: 38px;
+  --btn-height: 38px;
+  --btn-sm-height: 32px;
 }

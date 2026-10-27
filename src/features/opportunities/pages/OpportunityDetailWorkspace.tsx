@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  ArrowLeft, 
+  CheckCircle2, 
+  ChevronRight, 
+  Building2, 
+  User, 
+  ShieldCheck, 
+  Sparkles, 
+  Network, 
+  Send
+} from 'lucide-react';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useOpportunity, useValidateOpportunity } from '../../../hooks/useOpportunities';
-import { TrustBadge } from '../../../components/intelligence/TrustBadge';
 import { useUIStore } from '../../../store/uiStore';
 import type { Opportunity } from '../../../services/api/opportunities.api';
 
@@ -17,6 +27,7 @@ export const OpportunityDetailWorkspace: React.FC = () => {
   const navigate = useNavigate();
   const { openEvidenceDrawer } = useUIStore();
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'solution' | 'network' | 'introductions' | 'activity'>('overview');
   
   const { data: opp, isLoading, isError } = useOpportunity(id || '');
   const validateMutation = useValidateOpportunity(id || '');
@@ -114,20 +125,14 @@ export const OpportunityDetailWorkspace: React.FC = () => {
               alignItems: 'center',
               gap: '6px',
               padding: '8px 16px',
-              borderRadius: 'var(--radius-sm)',
-              background: '#4338ca',
+              borderRadius: '8px',
+              background: '#2563EB',
               color: '#ffffff',
               fontSize: '13px',
               fontWeight: 600,
               textDecoration: 'none',
-              boxShadow: '0 1px 3px rgba(67, 56, 202, 0.2)',
+              boxShadow: '0 1px 3px rgba(37, 99, 235, 0.2)',
               transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#3730a3';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#4338ca';
             }}
           >
             <span>Apply for this Position ↗</span>
@@ -142,518 +147,696 @@ export const OpportunityDetailWorkspace: React.FC = () => {
               disabled: validateMutation.isPending
             }
           : {
-              label: 'Proceed to Solution & Capability Matching',
+              label: 'Proceed to Solution Matching',
               onClick: () => navigate(`/opportunities/${id}/matching`),
               disabled: opp?.status !== 'VALIDATED'
             }
       }
     >
       {opp && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-7)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
-            {/* Validation Error Banner */}
-            {validateMutation.isError && (
-              <div style={{
-                padding: 'var(--space-4)',
-                background: '#FEF2F2',
-                border: '1px solid #FECACA',
-                borderRadius: 'var(--radius-lg)',
-                color: '#991B1B',
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Header Action & Priority Sub-bar */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+            paddingBottom: '8px'
+          }}>
+            <button
+              onClick={() => navigate('/opportunities')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'none',
+                border: 'none',
+                color: '#64748B',
                 fontSize: '13px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '4px 0'
+              }}
+            >
+              <ArrowLeft size={16} />
+              <span>Back to Opportunities</span>
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                display: 'inline-block',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                background: opp.confidence >= 80 ? '#FEF2F2' : '#FEF3C7',
+                color: opp.confidence >= 80 ? '#B91C1C' : '#B45309',
+                border: `1px solid ${opp.confidence >= 80 ? '#FEE2E2' : '#FDE68A'}`
               }}>
-                <div>
-                  <strong>Validation Failed:</strong> {(validateMutation.error as any)?.message || 'An error occurred during validation.'}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => validateMutation.reset()}
-                  style={{ background: 'none', border: 'none', color: '#991B1B', cursor: 'pointer', fontWeight: 700 }}
-                >
-                  &times;
-                </button>
-              </div>
-            )}
+                {opp.confidence >= 80 ? 'High Priority' : 'Medium Priority'}
+              </span>
 
-            {/* Candidate / Review Warning Banner */}
-            {opp.status === 'CANDIDATE' && (
-              <div style={{ padding: 'var(--space-4)', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--radius-lg)' }}>
-                <p className="body-text-important" style={{ margin: 0, color: '#92400e' }}>
-                  <strong>System-Suggested Opportunity:</strong> This opportunity was generated from verified research and requires Founder Validation before it can proceed to Matching.
-                </p>
-              </div>
-            )}
-
-            {/* Prominent Job Links & Official Posting Box (for Job Openings) */}
-            {isJobOpening && (
-              <section style={{
-                background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)',
-                padding: 'var(--space-6)',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid #c7d2fe',
-                boxShadow: '0 2px 8px rgba(67, 56, 202, 0.06)'
+              <span style={{
+                display: 'inline-block',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                background: opp.status === 'VALIDATED' ? '#ECFDF5' : '#EFF6FF',
+                color: opp.status === 'VALIDATED' ? '#047857' : '#1D4ED8',
+                border: `1px solid ${opp.status === 'VALIDATED' ? '#A7F3D0' : '#DBEAFE'}`
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      letterSpacing: '0.06em',
-                      textTransform: 'uppercase',
-                      padding: '3px 8px',
-                      borderRadius: '4px',
-                      background: '#4338ca',
-                      color: '#ffffff'
-                    }}>
-                      💼 Official Job Opening
-                    </span>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#1e1b4b' }}>
-                      {opp.companyName} · {opp.title}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>
-                    Sourced: {new Date(opp.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-
-                {/* Primary Apply Link Input Bar */}
-                {primaryApplyUrl && (
-                  <div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: '#ffffff',
-                      padding: '8px 10px 8px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid #cbd5e1',
-                      marginBottom: jobLinks.length > 1 ? 'var(--space-4)' : 0
-                    }}>
-                      <span style={{ fontSize: '15px', color: '#6366f1' }}>🔗</span>
-                      <a
-                        href={primaryApplyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          flex: 1,
-                          fontFamily: 'monospace',
-                          fontSize: '13px',
-                          color: '#3730a3',
-                          fontWeight: 500,
-                          textDecoration: 'none',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
-                        title={primaryApplyUrl}
-                      >
-                        {primaryApplyUrl}
-                      </a>
-                      <button
-                        onClick={() => handleCopy(primaryApplyUrl)}
-                        style={{
-                          padding: '6px 12px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          borderRadius: 'var(--radius-sm)',
-                          border: '1px solid #cbd5e1',
-                          background: copiedUrl === primaryApplyUrl ? '#ecfdf5' : '#f8fafc',
-                          color: copiedUrl === primaryApplyUrl ? '#047857' : '#334155',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        {copiedUrl === primaryApplyUrl ? '✓ Copied!' : 'Copy Link'}
-                      </button>
-                      <a
-                        href={primaryApplyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          padding: '6px 14px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          borderRadius: 'var(--radius-sm)',
-                          background: '#4338ca',
-                          color: '#ffffff',
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          transition: 'all 0.15s ease',
-                          whiteSpace: 'nowrap'
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = '#3730a3'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = '#4338ca'; }}
-                      >
-                        Open Job Posting ↗
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {/* Additional Cross-Source Links if multiple exist */}
-                {jobLinks.length > 1 && (
-                  <div style={{ marginTop: 'var(--space-3)', borderTop: '1px solid #e2e8f0', paddingTop: 'var(--space-3)' }}>
-                    <p style={{ margin: '0 0 var(--space-2) 0', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: '#64748b' }}>
-                      All Linked Postings ({jobLinks.length})
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {jobLinks.map((link, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', background: '#ffffff', padding: '6px 12px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                            <span style={{ fontWeight: 600, color: '#4338ca', whiteSpace: 'nowrap' }}>{link.source}:</span>
-                            <span style={{ color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.url}</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                            <button
-                              onClick={() => handleCopy(link.url)}
-                              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}
-                            >
-                              {copiedUrl === link.url ? '✓ Copied' : 'Copy'}
-                            </button>
-                            <a
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: '#4338ca', fontWeight: 600, textDecoration: 'none', fontSize: '11px' }}
-                            >
-                              Visit ↗
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Why This Opportunity Exists */}
-            <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <h2 className="section-title" style={{ margin: '0 0 var(--space-6) 0', textTransform: 'uppercase' }}>Why This Opportunity Exists</h2>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-                <div>
-                  <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>Underlying Problem / Hiring Need</h3>
-                  <p className="body-text" style={{ margin: 0 }}>{opp.problem}</p>
-                </div>
-                
-                <div>
-                  <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>Explicit Requirement / Target Profile</h3>
-                  <p className="body-text" style={{ margin: 0 }}>{opp.requirement}</p>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-                  <div>
-                    <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>Hiring Timeline</h3>
-                    <p className="body-text" style={{ margin: 0, color: opp.timeline ? 'inherit' : 'var(--color-text-secondary)' }}>
-                      {opp.timeline || 'Active recruitment underway.'}
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>Budget / Compensation Signal</h3>
-                    <p className="body-text" style={{ margin: 0, color: opp.budgetSignal ? 'inherit' : 'var(--color-text-secondary)' }}>
-                      {opp.budgetSignal || 'Disclosed in job posting.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Full Job Description Section (if available) */}
-            {opp.description && (
-              <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-                  <h2 className="section-title" style={{ margin: 0, textTransform: 'uppercase' }}>
-                    Full Job Posting & Role Details
-                  </h2>
-                  {primaryApplyUrl && (
-                    <a
-                      href={primaryApplyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: '12px',
-                        color: '#4338ca',
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}
-                    >
-                      Apply on External Board ↗
-                    </a>
-                  )}
-                </div>
-                <div style={{
-                  padding: 'var(--space-5)',
-                  background: '#f8fafc',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '13px',
-                  lineHeight: '1.6',
-                  color: '#1e293b',
-                  maxHeight: '450px',
-                  overflowY: 'auto',
-                  whiteSpace: 'pre-wrap'
-                }}>
-                  {opp.description}
-                </div>
-              </section>
-            )}
-
-            {/* Product & Capability Fit (if matched) */}
-            {opp.matchedProductName && (
-              <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-                  <h2 className="section-title" style={{ margin: 0, textTransform: 'uppercase' }}>Ottobon Product Fit</h2>
-                  {opp.matchScore !== null && opp.matchScore !== undefined && (
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#166534', background: '#F0FDF4', padding: '2px 8px', borderRadius: '4px', border: '1px solid #BBF7D0' }}>
-                      Fit Score: {opp.matchScore}%
-                    </span>
-                  )}
-                </div>
-                <div style={{ padding: 'var(--space-4)', background: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                  <h4 style={{ margin: '0 0 var(--space-2) 0', fontSize: '14px', color: '#1E293B', fontWeight: 600 }}>
-                    {opp.matchedProductName}
-                  </h4>
-                  {opp.matchRationale && (
-                    <p style={{ margin: 0, fontSize: '13px', color: '#475569', lineHeight: '1.4' }}>
-                      {opp.matchRationale}
-                    </p>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* Review Audit Record (if validated or reviewed) */}
-            {opp.reviewedBy && (
-              <section style={{ background: '#F0FDF4', padding: 'var(--space-4)', borderRadius: 'var(--radius-lg)', border: '1px solid #BBF7D0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#166534' }}>
-                    Founder Review Confirmed ({opp.status})
-                  </span>
-                  <span style={{ fontSize: '11px', color: '#15803D' }}>
-                    Reviewed by <strong>{opp.reviewedBy}</strong>
-                    {opp.reviewedAt && <> on {new Date(opp.reviewedAt).toLocaleString()}</>}
-                  </span>
-                </div>
-                {opp.reviewNotes && (
-                  <p style={{ margin: '6px 0 0 0', fontSize: '12px', fontStyle: 'italic', color: '#166534' }}>
-                    &ldquo;{opp.reviewNotes}&rdquo;
-                  </p>
-                )}
-              </section>
-            )}
-
-            {/* Trusted Context & Evidence Provenance */}
-            <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
-                <h2 className="section-title" style={{ margin: 0, textTransform: 'uppercase' }}>Trusted Context & Provenance</h2>
-                {opp.personId && (
-                  <button 
-                    className="button-text"
-                    onClick={() => navigate(`/people/${opp.personId}/context`)}
-                    style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
-                  >
-                    View Full Contact Context
-                  </button>
-                )}
-              </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                {opp.trustedContextIds && opp.trustedContextIds.length > 0 ? (
-                  opp.trustedContextIds.map(tcId => (
-                    <div key={tcId} style={{ padding: 'var(--space-4)', background: 'var(--color-bg-primary)', borderRadius: 'var(--radius-sm)', borderLeft: '4px solid var(--color-brand-primary)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-                        <TrustBadge level="CONFIRMED" />
-                        <span className="metadata text-secondary">Trusted Context ID: {tcId}</span>
-                      </div>
-                      <p className="body-text" style={{ margin: 0 }}>
-                        This opportunity was directly derived from verified intelligence and trusted context.
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ padding: 'var(--space-4)', background: 'var(--color-bg-primary)', borderRadius: 'var(--radius-sm)' }}>
-                    <p className="body-text text-secondary" style={{ margin: 0 }}>
-                      Created via Opportunity Intelligence Engine with verified commercial signals.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </section>
+                {opp.status === 'VALIDATED' ? 'Validated' : 'In Analysis'}
+              </span>
+            </div>
           </div>
 
-          {/* Right Sidebar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
-            
-            <section style={{ background: 'var(--color-bg-primary)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-4) 0' }}>Opportunity State</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: opp.status === 'VALIDATED' ? 'var(--color-success)' : '#f59e0b' }} />
-                <span className="body-text-important">{opp.status.replace('_', ' ')}</span>
-              </div>
-              
-              {opp.status === 'VALIDATED' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
-                  
-                  <div style={{ background: '#F8FAFC', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                    <h4 className="labels text-secondary" style={{ marginBottom: 'var(--space-4)' }}>Lifecycle Progression</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <span className="body-text-important" style={{ color: 'var(--color-success)' }}>✓</span><span className="metadata">VALIDATED</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>○</span><span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>CAPABILITY MATCHED</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>○</span><span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>NETWORK MATCHED</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>○</span><span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>INTRODUCTION APPROVED</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>○</span><span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>POST-INTRODUCTION & OUTCOME</span>
-                      </div>
-                    </div>
-                  </div>
+          {/* Segmented Tabs Strip (Screen 5) */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            borderBottom: '1px solid #E2E8F0',
+            marginBottom: '4px'
+          }}>
+            {[
+              { key: 'overview', label: 'Overview', path: `/opportunities/${id}` },
+              { key: 'solution', label: 'Solution Matching', path: `/opportunities/${id}/matching` },
+              { key: 'network', label: 'Network Matching', path: `/opportunities/${id}/network-matching` },
+              { key: 'introductions', label: 'Introductions', path: `/opportunities/${id}/introduction` },
+              { key: 'activity', label: 'Activity', path: `/opportunities/${id}/post-introduction` },
+            ].map(tab => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => {
+                    setActiveTab(tab.key as any);
+                    if (tab.key !== 'overview') navigate(tab.path);
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '10px 18px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? '#2563EB' : '#64748B',
+                    borderBottom: isActive ? '2px solid #2563EB' : '2px solid transparent',
+                    marginBottom: '-1px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
 
-                  <div style={{ background: '#F8FAFC', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                    <span className="labels text-secondary" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>Workspaces</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                      <button className="button-text" onClick={() => navigate(`/opportunities/${id}/matching`)} style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0, textAlign: 'left' }}>
-                        1. Capability Matching &rarr;
-                      </button>
-                      <button className="button-text" onClick={() => navigate(`/opportunities/${id}/network-matching`)} style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0, textAlign: 'left' }}>
-                        2. Network Matching &rarr;
-                      </button>
-                      <button className="button-text" onClick={() => navigate(`/opportunities/${id}/introduction`)} style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0, textAlign: 'left' }}>
-                        3. Founder Introduction &rarr;
-                      </button>
-                      <button className="button-text" onClick={() => navigate(`/opportunities/${id}/post-introduction`)} style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0, textAlign: 'left' }}>
-                        4. Outcome & Feedback &rarr;
-                      </button>
-                    </div>
+          {/* Screen 5: 3-Column Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '290px minmax(0, 1fr) 310px',
+            gap: '20px',
+            alignItems: 'start'
+          }}>
+            
+            {/* COLUMN 1 (LEFT): Opportunity Details */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Opportunity Details
+                </h3>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                    Company / Target
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: '#0F172A', fontSize: '14px' }}>
+                    <Building2 size={16} color="#2563EB" />
+                    <span>{opp.companyName}</span>
                   </div>
                 </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                    Opportunity Type
+                  </span>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: '#F1F5F9',
+                    color: '#334155',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    border: '1px solid #E2E8F0'
+                  }}>
+                    {opp.opportunityType === 'JOB_OPENING' ? 'Job Opening' : opp.opportunityType}
+                  </span>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                    Stage
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: opp.status === 'VALIDATED' ? '#10B981' : '#2563EB'
+                    }} />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B' }}>
+                      {opp.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                    Priority
+                  </span>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: opp.confidence >= 80 ? '#FEF2F2' : '#FEF3C7',
+                    color: opp.confidence >= 80 ? '#B91C1C' : '#B45309'
+                  }}>
+                    {opp.confidence >= 80 ? 'HIGH' : 'MEDIUM'}
+                  </span>
+                </div>
+
+                {opp.personName && (
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                      Key Contact
+                    </span>
+                    <button
+                      onClick={() => opp.personId && navigate(`/people/${opp.personId}`)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'none',
+                        border: 'none',
+                        color: '#2563EB',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: opp.personId ? 'pointer' : 'default',
+                        padding: 0
+                      }}
+                    >
+                      <User size={14} />
+                      <span>{opp.personName}</span>
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
+                    <span>Created</span>
+                    <span style={{ fontWeight: 500, color: '#1E293B' }}>{new Date(opp.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
+                    <span>Updated</span>
+                    <span style={{ fontWeight: 500, color: '#1E293B' }}>{new Date(opp.updatedAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Confidence</span>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: opp.confidence >= 80 ? '#047857' : '#1D4ED8' }}>
+                      {opp.confidence}%
+                    </span>
+                  </div>
+                  <div style={{ width: '100%', height: '6px', background: '#E2E8F0', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${opp.confidence}%`,
+                      height: '100%',
+                      background: opp.confidence >= 80 ? '#10B981' : '#3B82F6',
+                      borderRadius: '3px'
+                    }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* COLUMN 2 (CENTER): Summary, Problem Statement & Next Steps */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Validation Error Banner */}
+              {validateMutation.isError && (
+                <div style={{
+                  padding: '14px 18px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: '12px',
+                  color: '#991B1B',
+                  fontSize: '13px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <strong>Validation Failed:</strong> {(validateMutation.error as any)?.message || 'An error occurred during validation.'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => validateMutation.reset()}
+                    style={{ background: 'none', border: 'none', color: '#991B1B', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    ×
+                  </button>
+                </div>
               )}
-            </section>
 
-            {/* Source & Origin Sidebar */}
-            <section style={{ background: 'var(--color-bg-primary)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-4) 0' }}>
-                {isJobOpening ? 'Job Source & Sourcing' : 'Source & Origin'}
-              </h3>
-              
-              <div style={{ marginBottom: 'var(--space-4)' }}>
-                <p className="body-text-important" style={{ margin: '0 0 var(--space-1) 0' }}>{opp.companyName}</p>
-                <p className="body-text text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>
-                  {isJobOpening 
-                    ? (jobLinks.length > 0 ? `Sourced from ${jobLinks[0].source}` : 'External Job Board')
-                    : (opp.personName || 'Unassigned Executive')}
-                </p>
+              {/* Candidate / Review Warning Banner */}
+              {opp.status === 'CANDIDATE' && (
+                <div style={{
+                  padding: '14px 18px',
+                  background: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px'
+                }}>
+                  <p style={{ margin: 0, color: '#92400E', fontSize: '13px' }}>
+                    <strong>System-Suggested Opportunity:</strong> Requires founder validation before advancing to capability matching.
+                  </p>
+                  <button
+                    onClick={() => validateMutation.mutate()}
+                    disabled={validateMutation.isPending}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      background: '#D97706',
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {validateMutation.isPending ? 'Validating...' : 'Validate Now'}
+                  </button>
+                </div>
+              )}
 
-                {primaryApplyUrl && (
-                  <div style={{ marginTop: '8px' }}>
+              {/* Problem Statement Card */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <div>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Underlying Problem Statement
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: '#1E293B' }}>
+                    {opp.problem}
+                  </p>
+                </div>
+
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '14px' }}>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Explicit Requirements
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: '#334155' }}>
+                    {opp.requirement}
+                  </p>
+                </div>
+
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
+                      Timeline Signal
+                    </span>
+                    <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>
+                      {opp.timeline || 'Active commercial cycle'}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
+                      Budget Signal
+                    </span>
+                    <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>
+                      {opp.budgetSignal || 'Disclosed during discovery'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Next Steps Interactive Checklist (Screen 5 specification) */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              }}>
+                <h3 style={{ margin: '0 0 14px 0', fontSize: '13px', fontWeight: 700, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Recommended Next Steps
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div 
+                    onClick={() => navigate(`/opportunities/${id}/matching`)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      background: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.background = '#EFF6FF'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = '#F8FAFC'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <CheckCircle2 size={16} color="#2563EB" />
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+                        1. Review capability matches
+                      </span>
+                    </div>
+                    <ChevronRight size={14} color="#64748B" />
+                  </div>
+
+                  <div 
+                    onClick={() => navigate(`/opportunities/${id}/network-matching`)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      background: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.background = '#EFF6FF'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = '#F8FAFC'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Network size={16} color="#64748B" />
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+                        2. Evaluate network connections
+                      </span>
+                    </div>
+                    <ChevronRight size={14} color="#64748B" />
+                  </div>
+
+                  <div 
+                    onClick={() => navigate(`/opportunities/${id}/introduction`)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      background: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.background = '#EFF6FF'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = '#F8FAFC'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Send size={16} color="#64748B" />
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+                        3. Prepare warm introduction request
+                      </span>
+                    </div>
+                    <ChevronRight size={14} color="#64748B" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Prominent Job Links (if Job Opening) */}
+              {isJobOpening && primaryApplyUrl && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%)',
+                  padding: '20px',
+                  borderRadius: '12px',
+                  border: '1px solid #C7D2FE',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#4338CA', textTransform: 'uppercase' }}>
+                      Official Job Posting
+                    </span>
                     <a
                       href={primaryApplyUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{
-                        color: 'var(--color-brand-primary)',
-                        textDecoration: 'none',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                      style={{ fontSize: '12px', color: '#2563EB', fontWeight: 600, textDecoration: 'none' }}
                     >
-                      Official Job Board Link ↗
+                      Visit External Link ↗
                     </a>
                   </div>
-                )}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: '#FFFFFF',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1'
+                  }}>
+                    <span style={{ flex: 1, fontFamily: 'monospace', fontSize: '12px', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {primaryApplyUrl}
+                    </span>
+                    <button
+                      onClick={() => handleCopy(primaryApplyUrl)}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        borderRadius: '4px',
+                        border: '1px solid #CBD5E1',
+                        background: copiedUrl === primaryApplyUrl ? '#ECFDF5' : '#F8FAFC',
+                        color: copiedUrl === primaryApplyUrl ? '#047857' : '#334155',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {copiedUrl === primaryApplyUrl ? '✓ Copied' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
-                {opp.personId ? (
-                  <button 
-                    className="button-text"
-                    onClick={() => navigate(`/people/${opp.personId}`)}
-                    style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0, marginTop: '8px', display: 'block' }}
+            {/* COLUMN 3 (RIGHT): Key Matches & Lifecycle Progression */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Key Matches Summary Card (Screen 5 specification) */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }}>
+                <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Key Matches
+                </h3>
+
+                <div 
+                  onClick={() => navigate(`/opportunities/${id}/matching`)}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Sparkles size={16} color="#2563EB" />
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>Capabilities</div>
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>3 Available Solutions</div>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} color="#64748B" />
+                </div>
+
+                <div 
+                  onClick={() => navigate(`/opportunities/${id}/network-matching`)}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Network size={16} color="#10B981" />
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>Network Connections</div>
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>5 Warm Connections</div>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} color="#64748B" />
+                </div>
+
+                {opp.status === 'CANDIDATE' ? (
+                  <button
+                    onClick={() => validateMutation.mutate()}
+                    disabled={validateMutation.isPending}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      background: '#2563EB',
+                      color: '#FFFFFF',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      marginTop: '4px'
+                    }}
                   >
-                    View Contact 360 &rarr;
+                    {validateMutation.isPending ? 'Validating...' : 'Validate Opportunity'}
                   </button>
-                ) : null}
+                ) : (
+                  <button
+                    onClick={() => navigate(`/opportunities/${id}/matching`)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      background: '#2563EB',
+                      color: '#FFFFFF',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      marginTop: '4px'
+                    }}
+                  >
+                    Proceed to Matching →
+                  </button>
+                )}
               </div>
 
-              {opp.sourceMeetingId && (
-                <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-4)' }}>
-                  <p className="labels text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>Source Meeting</p>
-                  <p className="body-text" style={{ margin: '0 0 var(--space-2) 0' }}>Meeting ID: {opp.sourceMeetingId}</p>
-                  <button 
-                    className="button-text"
-                    onClick={() => navigate(`/meetings/${opp.sourceMeetingId}/brief`)}
-                    style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
-                  >
-                    View Meeting Brief &rarr;
-                  </button>
-                </div>
-              )}
-            </section>
+              {/* Lifecycle Progression Stepper */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              }}>
+                <h3 style={{ margin: '0 0 14px 0', fontSize: '13px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Progression Stepper
+                </h3>
 
-            {/* Evidence Trace Sidebar */}
-            <section style={{ background: 'var(--color-bg-primary)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-4) 0' }}>Evidence Trace</h3>
-              <p style={{ margin: '0 0 var(--space-3) 0', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                Opportunity Confidence: <strong>{opp.confidence}%</strong>
-              </p>
-
-              {/* Verified Job Links List in Evidence */}
-              {jobLinks.length > 0 && (
-                <div style={{ marginBottom: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: '#64748b' }}>
-                    Verified Sourcing Citations:
-                  </span>
-                  {jobLinks.map((link, idx) => (
-                    <a
-                      key={idx}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: '11px',
-                        color: '#4338ca',
-                        background: '#ffffff',
-                        padding: '5px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid #c7d2fe',
-                        textDecoration: 'none',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        display: 'block'
-                      }}
-                      title={link.url}
-                    >
-                      ↗ {link.source}
-                    </a>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {[
+                    { label: 'Opportunity Identified', done: true },
+                    { label: 'Validated by Founder', done: opp.status === 'VALIDATED' || (opp.status as string) === 'IN_PROGRESS' || opp.status === 'SOLUTION_MATCHING' || opp.status === 'PATH_DEFINED' },
+                    { label: 'Capability Matched', done: (opp.status as string) === 'IN_PROGRESS' || opp.status === 'SOLUTION_MATCHING' || opp.status === 'PATH_DEFINED' },
+                    { label: 'Network Matched', done: (opp.status as string) === 'IN_PROGRESS' || opp.status === 'PATH_DEFINED' },
+                    { label: 'Warm Intro Approved', done: false }
+                  ].map((step, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: step.done ? '#ECFDF5' : '#F1F5F9',
+                        color: step.done ? '#047857' : '#94A3B8',
+                        border: `1px solid ${step.done ? '#A7F3D0' : '#E2E8F0'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '10px',
+                        fontWeight: 700
+                      }}>
+                        {step.done ? '✓' : idx + 1}
+                      </div>
+                      <span style={{ color: step.done ? '#0F172A' : '#64748B', fontWeight: step.done ? 600 : 400 }}>
+                        {step.label}
+                      </span>
+                    </div>
                   ))}
                 </div>
-              )}
+              </div>
 
-              <button 
-                onClick={() => openEvidenceDrawer(opp.id, opp.status === 'VALIDATED' ? 'CONFIRMED' : 'INFERENCE', opp.title)}
-                className="button-text"
-                style={{ width: '100%', padding: 'var(--space-3)', background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-              >
-                View Aggregated Evidence
-              </button>
-            </section>
-
+              {/* Aggregated Evidence Drawer Trigger */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '16px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <ShieldCheck size={16} color="#2563EB" />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>Evidence & Provenance</span>
+                </div>
+                <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#64748B' }}>
+                  Confidence rating based on verified scraped data & authoritative references.
+                </p>
+                <button
+                  onClick={() => openEvidenceDrawer(opp.id, opp.status === 'VALIDATED' ? 'CONFIRMED' : 'INFERENCE', opp.title)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    color: '#334155',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  View Evidence Drawer
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

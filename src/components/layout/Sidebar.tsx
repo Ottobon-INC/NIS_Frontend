@@ -1,21 +1,26 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, Target, Network, Package } from 'lucide-react';
+import { LayoutDashboard, Users, Target, Calendar, Network, Send, Layers } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
 const navItems = [
-  { path: '/people', label: 'People / Relationships', icon: Users },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/people', label: 'People', icon: Users },
   { path: '/opportunities', label: 'Opportunities', icon: Target },
-  { path: '/network', label: 'Network Intelligence', icon: Network },
-  { path: '/capabilities', label: 'Products & Capabilities', icon: Package },
+  { path: '/meetings', label: 'Meetings', icon: Calendar },
+  { path: '/network', label: 'Network', icon: Network },
+  { path: '/introductions', label: 'Introductions', icon: Send },
+  { path: '/capabilities', label: 'Capabilities', icon: Layers },
 ];
 
 export const Sidebar: React.FC = () => {
   return (
     <aside className={styles.sidebar}>
       <div className={styles.logoContainer}>
+        <div className={styles.logoBadge}>
+          <Network size={18} color="#fff" />
+        </div>
         <h2 className={styles.logo}>NetworkOS</h2>
-        <span className={styles.subtitle}>Client Intelligence</span>
       </div>
       <nav className={styles.nav}>
         {navItems.map((item) => {
@@ -26,7 +31,7 @@ export const Sidebar: React.FC = () => {
               to={item.path}
               className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
             >
-              <Icon size={20} />
+              <Icon size={18} className={styles.navIcon} />
               <span>{item.label}</span>
             </NavLink>
           );

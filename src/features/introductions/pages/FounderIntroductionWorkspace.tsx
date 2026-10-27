@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  ArrowLeft, 
+  CheckCircle2, 
+  Send, 
+  CheckSquare, 
+  Square, 
+  Sparkles,
+  Save
+} from 'lucide-react';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useIntroductionRecommendation, useUpdateIntroductionDraft, useUpdateIntroductionStatus } from '../../../hooks/useIntroduction';
 import { TrustBadge } from '../../../components/intelligence/TrustBadge';
@@ -16,6 +25,10 @@ export const FounderIntroductionWorkspace: React.FC = () => {
   const statusMutation = useUpdateIntroductionStatus(id || '');
 
   const [draftContent, setDraftContent] = useState('');
+  const [includeSummary, setIncludeSummary] = useState(true);
+  const [includeContext, setIncludeContext] = useState(true);
+  const [includeBackground, setIncludeBackground] = useState(true);
+  const [includeNextSteps, setIncludeNextSteps] = useState(true);
 
   useEffect(() => {
     if (intro?.messageDraft) {
@@ -28,7 +41,6 @@ export const FounderIntroductionWorkspace: React.FC = () => {
   const handleSaveDraft = () => {
     if (intro) {
       draftMutation.mutate({ introId: intro.id, messageDraft: draftContent });
-      // Also silently mark as FOUNDER_EDITED if it was DRAFT
       if (intro.status === 'DRAFT') {
         statusMutation.mutate({ introId: intro.id, status: 'FOUNDER_EDITED' });
       }
@@ -46,203 +58,504 @@ export const FounderIntroductionWorkspace: React.FC = () => {
 
   return (
     <WorkspaceShell
-      title="Founder Introduction Intelligence"
-      subtitle="Review the introduction recommendation, verify mutual value, and approve the message draft."
+      title="Request Introduction"
+      subtitle="Prepare an introduction to connect the right people"
       breadcrumbs={[
         { label: 'Opportunities', path: '/opportunities' },
         { label: intro?.context.opportunityTitle || 'Detail', path: `/opportunities/${id}` },
         { label: 'Network Matching', path: `/opportunities/${id}/network-matching` },
-        { label: 'Introduction', path: `/opportunities/${id}/introduction` }
+        { label: 'Request Introduction', path: `/opportunities/${id}/introduction` }
       ]}
       isLoading={isLoading}
       isError={isError}
       isEmpty={!isLoading && !intro}
       emptyStateMessage="No introduction recommendation available for this opportunity."
+      primaryAction={
+        isApproved ? {
+          label: 'Proceed to Post-Introduction Tracking →',
+          onClick: () => navigate(`/opportunities/${id}/post-introduction`),
+          disabled: false
+        } : undefined
+      }
     >
       {intro && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Top Context Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-6)' }}>
-            <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-4)' }}>
-                <h3 className="labels text-secondary" style={{ margin: 0 }}>Introduction Target</h3>
-                <button 
-                  className="button-text"
-                  onClick={() => navigate(`/people/${intro.personId}`)}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
-                >
-                  View Person &rarr;
-                </button>
-              </div>
-              <p className="body-text-important" style={{ margin: '0 0 var(--space-2) 0' }}>{intro.context.personName}</p>
-              <p className="body-text text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>{intro.context.companyName}</p>
-              <p className="body-text text-secondary" style={{ margin: 0 }}>Opportunity: <span className="body-text-important" style={{ color: 'var(--color-text-primary)' }}>{intro.context.opportunityTitle}</span></p>
-            </section>
-            
-            <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-4) 0' }}>Selected Capability</h3>
-              <p className="body-text-important" style={{ margin: 0 }}>{intro.context.capabilityName}</p>
-            </section>
+          {/* Header Action Back Button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button
+              onClick={() => navigate(`/opportunities/${id}/network-matching`)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'none',
+                border: 'none',
+                color: '#64748B',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '4px 0'
+              }}
+            >
+              <ArrowLeft size={16} />
+              <span>Back to Network Matching</span>
+            </button>
 
-            <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-4) 0' }}>Network Match</h3>
-              <p className="body-text-important" style={{ margin: '0 0 var(--space-2) 0' }}>{intro.context.networkMatchName}</p>
-              <p className="body-text text-secondary" style={{ margin: 0 }}>{intro.context.networkMatchCompany}</p>
-            </section>
+            <span style={{ fontSize: '13px', color: '#64748B' }}>
+              Target Opportunity: <strong>{intro.context?.opportunityTitle || 'Enterprise Pilot'}</strong>
+            </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-7)' }}>
-            {/* Left Column: Reasoning & Mutual Value */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
+          {/* 3-Step Stepper (Screen 8 specification) */}
+          <div style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
+            padding: '16px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+          }}>
+            {/* Step 1 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: '#ECFDF5',
+                color: '#047857',
+                border: '1px solid #A7F3D0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 700
+              }}>
+                ✓
+              </div>
+              <div>
+                <span style={{ fontSize: '11px', color: '#047857', fontWeight: 600, textTransform: 'uppercase' }}>Step 1</span>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>Select Connection</div>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, height: '2px', background: '#2563EB', margin: '0 16px' }} />
+
+            {/* Step 2 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: '#2563EB',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 700
+              }}>
+                2
+              </div>
+              <div>
+                <span style={{ fontSize: '11px', color: '#2563EB', fontWeight: 600, textTransform: 'uppercase' }}>Step 2 (Active)</span>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>Review &amp; Edit Draft</div>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, height: '2px', background: isApproved ? '#2563EB' : '#E2E8F0', margin: '0 16px' }} />
+
+            {/* Step 3 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: isApproved ? '#ECFDF5' : '#F1F5F9',
+                color: isApproved ? '#047857' : '#94A3B8',
+                border: `1px solid ${isApproved ? '#A7F3D0' : '#E2E8F0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 700
+              }}>
+                {isApproved ? '✓' : '3'}
+              </div>
+              <div>
+                <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Step 3</span>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: isApproved ? '#0F172A' : '#64748B' }}>Send Request</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2-Column Split (Screen 8 specification) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.4fr) minmax(320px, 1fr)',
+            gap: '24px',
+            alignItems: 'start'
+          }}>
+            
+            {/* LEFT COLUMN: Target Intermediary, Reasoning, and Message Draft */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              <section style={{ background: '#fff', padding: 'var(--space-7)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-                <h3 className="section-title" style={{ margin: '0 0 var(--space-6) 0' }}>Why This Introduction?</h3>
-                <p className="body-text" style={{ margin: '0 0 var(--space-6) 0' }}>{intro.introductionReason}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 'var(--space-6)', borderTop: '1px solid var(--color-border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <TrustBadge level="INFERENCE" />
-                    <span className="metadata text-secondary">Confidence: {intro.confidence}%</span>
+              {/* Target Intermediary Card */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '50%',
+                    background: '#EEF2FF',
+                    color: '#2563EB',
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {((intro.context?.personName || 'Priya Sharma')).split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                   </div>
-                  <button 
-                    className="button-text"
-                    onClick={() => openEvidenceDrawer(intro.evidenceIds[0], 'INFERENCE', 'Introduction Recommendation')}
-                    style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
+                      Target Connection / Intermediary
+                    </span>
+                    <h4 style={{ margin: '2px 0 0 0', fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>
+                      {intro.context?.personName || 'Connection'}
+                    </h4>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#64748B' }}>
+                      {intro.context?.companyName || 'Target Company'}
+                    </p>
+                  </div>
+                </div>
+
+                <span style={{
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  background: '#ECFDF5',
+                  color: '#047857',
+                  border: '1px solid #A7F3D0'
+                }}>
+                  {intro.context?.relationshipStrength || 'Strong'} Connection
+                </span>
+              </div>
+
+              {/* Why This Connection Card */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={16} color="#2563EB" />
+                  <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Why This Connection?
+                  </h4>
+                </div>
+                <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.6', color: '#334155' }}>
+                  {intro.introductionReason || 'Strategic investor with deep ties to enterprise procurement leads and AI portfolio companies.'}
+                </p>
+
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <TrustBadge level="INFERENCE" />
+                    <span style={{ fontSize: '12px', color: '#64748B' }}>Confidence: {intro.confidence || 92}%</span>
+                  </div>
+                  <button
+                    onClick={() => openEvidenceDrawer(intro.evidenceIds?.[0] || 'ev-1', 'INFERENCE', 'Introduction Recommendation')}
+                    style={{ background: 'none', border: 'none', color: '#2563EB', fontSize: '12px', fontWeight: 600, cursor: 'pointer', padding: 0 }}
                   >
                     View Supporting Evidence
                   </button>
                 </div>
-              </section>
+              </div>
 
-              <section style={{ background: '#fff', padding: 'var(--space-7)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-                <h3 className="section-title" style={{ margin: '0 0 var(--space-6) 0' }}>Relationship Context</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="metadata text-secondary">Role</span>
-                    <span className="body-text-important">{intro.context.relationshipRole}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="metadata text-secondary">Strength</span>
-                    <span className="body-text-important" style={{ color: intro.context.relationshipStrength === 'STRONG' ? 'var(--color-success)' : 'inherit' }}>
-                      {intro.context.relationshipStrength}
+              {/* Editable Message Draft Textarea */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
+                      Message Draft
+                    </h4>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: '#F1F5F9',
+                      color: '#64748B'
+                    }}>
+                      {intro.status === 'DRAFT' ? 'AI Generated' : 'Founder Edited'}
                     </span>
                   </div>
-                </div>
-              </section>
 
-              <section style={{ background: '#fff', padding: 'var(--space-7)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-                <h3 className="section-title" style={{ margin: '0 0 var(--space-6) 0' }}>Mutual Value</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-                  <div>
-                    <h4 className="labels text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>How They Help Us</h4>
-                    <p className="body-text" style={{ margin: 0 }}>{intro.mutualValue.howTheyHelpUs}</p>
-                  </div>
-                  <div>
-                    <h4 className="labels text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>How We Help Them</h4>
-                    <p className="body-text" style={{ margin: 0 }}>{intro.mutualValue.howWeHelpThem}</p>
-                  </div>
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={isApproved || isRejected || draftMutation.isPending}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #E2E8F0',
+                      background: '#FFFFFF',
+                      color: '#2563EB',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Save size={12} />
+                    <span>{draftMutation.isPending ? 'Saving...' : 'Save Draft'}</span>
+                  </button>
                 </div>
-              </section>
-            </div>
 
-            {/* Right Column: Draft & Decision */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
-              
-              <section style={{ background: '#fff', padding: 'var(--space-7)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
-                  <h3 className="section-title" style={{ margin: 0 }}>Message Draft</h3>
-                  <span className="labels text-secondary" style={{ background: 'var(--color-bg-primary)', padding: '2px 8px', borderRadius: 'var(--radius-sm)' }}>
-                    {intro.status === 'DRAFT' ? 'SYSTEM-GENERATED' : 'FOUNDER-EDITED'}
-                  </span>
-                </div>
-                
-                <textarea 
+                <textarea
                   value={draftContent}
                   onChange={(e) => setDraftContent(e.target.value)}
                   onBlur={handleSaveDraft}
-                  disabled={isApproved || isRejected || statusMutation.isPending}
-                  style={{ 
-                    flex: 1, 
-                    minHeight: '250px',
-                    width: '100%', 
-                    padding: 'var(--space-4)', 
-                    borderRadius: 'var(--radius-sm)', 
-                    border: '1px solid var(--color-border)', 
+                  disabled={isApproved || isRejected}
+                  rows={8}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '13px',
+                    lineHeight: '1.6',
                     fontFamily: 'inherit',
-                    fontSize: '0.9375rem',
-                    lineHeight: 1.6,
+                    color: '#0F172A',
+                    background: isApproved || isRejected ? '#F8FAFC' : '#FFFFFF',
                     resize: 'vertical',
-                    background: (isApproved || isRejected) ? '#f8fafc' : '#fff',
-                    color: (isApproved || isRejected) ? 'var(--color-text-secondary)' : 'var(--color-text-primary)'
+                    boxSizing: 'border-box',
+                    outline: 'none'
                   }}
                 />
-                
-                {!isApproved && !isRejected && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-4)' }}>
-                    <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                      Changes save automatically.
-                    </span>
-                  </div>
-                )}
-              </section>
 
-              <section style={{ background: '#fff', padding: 'var(--space-7)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-                {isApproved ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                    <div>
-                      <p className="body-text-important" style={{ margin: '0 0 var(--space-2) 0', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                        <span>✓</span> APPROVED FOR INTRODUCTION
-                      </p>
-                      <p className="body-text text-secondary" style={{ margin: 0 }}>
-                        The introduction has been reviewed and approved by the founder.
-                      </p>
-                    </div>
-                    <div style={{ background: '#F8FAFC', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                      <p className="body-text-important" style={{ margin: '0 0 var(--space-2) 0' }}>Ready for founder-controlled introduction.</p>
-                      <p className="body-text text-secondary" style={{ margin: '0 0 var(--space-4) 0' }}>No message has been sent automatically.</p>
-                      <button 
-                        className="button-text"
-                        onClick={() => navigate(`/opportunities/${id}/post-introduction`)}
-                        style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
-                      >
-                        Proceed to Outcome & Feedback &rarr;
-                      </button>
-                    </div>
-                  </div>
-                ) : isRejected ? (
-                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                    <p className="body-text-important" style={{ margin: 0, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                      <span>✕</span> INTRODUCTION REJECTED
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <h3 className="section-title" style={{ margin: '0 0 var(--space-6) 0' }}>Founder Attention</h3>
-                    <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-                      <button 
-                        className="button-text"
-                        onClick={() => handleStatusChange('APPROVED_FOR_INTRODUCTION')}
-                        disabled={statusMutation.isPending}
-                        style={{ flex: 1, padding: '0.875rem', background: 'var(--color-success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                      >
-                        Approve Introduction
-                      </button>
-                      <button 
-                        className="button-text"
-                        onClick={() => handleStatusChange('REJECTED')}
-                        disabled={statusMutation.isPending}
-                        style={{ flex: 1, padding: '0.875rem', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </>
-                )}
-              </section>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#64748B' }}>
+                  <span>{draftContent.length} characters</span>
+                  <span>Changes auto-save upon editing</span>
+                </div>
+              </div>
 
             </div>
-          </div>
 
+            {/* RIGHT COLUMN: 'Include in request' checklist & Approval Action */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              {/* Checklist Card */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '22px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Include in Request Checklist
+                </h4>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div 
+                    onClick={() => setIncludeSummary(!includeSummary)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: '#1E293B' }}
+                  >
+                    {includeSummary ? <CheckSquare size={16} color="#2563EB" /> : <Square size={16} color="#94A3B8" />}
+                    <span>Opportunity summary &amp; context</span>
+                  </div>
+
+                  <div 
+                    onClick={() => setIncludeContext(!includeContext)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: '#1E293B' }}
+                  >
+                    {includeContext ? <CheckSquare size={16} color="#2563EB" /> : <Square size={16} color="#94A3B8" />}
+                    <span>Your context &amp; relationship rationale</span>
+                  </div>
+
+                  <div 
+                    onClick={() => setIncludeBackground(!includeBackground)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: '#1E293B' }}
+                  >
+                    {includeBackground ? <CheckSquare size={16} color="#2563EB" /> : <Square size={16} color="#94A3B8" />}
+                    <span>Relevant background &amp; portfolio signals</span>
+                  </div>
+
+                  <div 
+                    onClick={() => setIncludeNextSteps(!includeNextSteps)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: '#1E293B' }}
+                  >
+                    {includeNextSteps ? <CheckSquare size={16} color="#2563EB" /> : <Square size={16} color="#94A3B8" />}
+                    <span>Suggested next steps &amp; agenda</span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {isApproved ? (
+                    <div style={{
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: '#ECFDF5',
+                      border: '1px solid #A7F3D0',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#047857', fontWeight: 700, fontSize: '13px' }}>
+                        <CheckCircle2 size={16} />
+                        <span>Introduction Approved</span>
+                      </div>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#065F46' }}>
+                        Ready for founder-controlled introduction dispatch.
+                      </p>
+                    </div>
+                  ) : isRejected ? (
+                    <div style={{
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: '#FEF2F2',
+                      border: '1px solid #FECACA',
+                      color: '#B91C1C',
+                      fontSize: '13px',
+                      textAlign: 'center',
+                      fontWeight: 600
+                    }}>
+                      Introduction Rejected
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button
+                        onClick={() => handleStatusChange('APPROVED_FOR_INTRODUCTION')}
+                        disabled={statusMutation.isPending}
+                        style={{
+                          width: '100%',
+                          padding: '11px',
+                          borderRadius: '8px',
+                          background: '#2563EB',
+                          color: '#FFFFFF',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Send size={14} />
+                        <span>Approve Introduction</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleStatusChange('REJECTED')}
+                        disabled={statusMutation.isPending}
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          borderRadius: '8px',
+                          background: '#FFFFFF',
+                          color: '#64748B',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          border: '1px solid #E2E8F0',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Decline / Reject
+                      </button>
+                    </div>
+                  )}
+
+                  {isApproved && (
+                    <button
+                      onClick={() => navigate(`/opportunities/${id}/post-introduction`)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        background: '#2563EB',
+                        color: '#FFFFFF',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        border: 'none',
+                        cursor: 'pointer',
+                        marginTop: '4px'
+                      }}
+                    >
+                      Proceed to Tracking →
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Mutual Value Summary Card */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Mutual Value Rationale
+                </h4>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
+                    How they help us
+                  </span>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1E293B', lineHeight: '1.4' }}>
+                    {intro.mutualValue?.howTheyHelpUs || 'Direct executive warm referral to Tier-1 CTO/CISO buying committees.'}
+                  </p>
+                </div>
+
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '10px' }}>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
+                    How we help them
+                  </span>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1E293B', lineHeight: '1.4' }}>
+                    {intro.mutualValue?.howWeHelpThem || 'Turnkey bounded governance bridge reducing enterprise AI compliance liabilities.'}
+                  </p>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
         </div>
       )}
     </WorkspaceShell>

@@ -9,7 +9,9 @@ import { FounderIntroductionWorkspace } from '../introductions/pages/FounderIntr
 export const opportunityRoutes: RouteObject[] = [
   { path: '/opportunities', element: <OpportunityWorkspace /> },
   { path: '/opportunities/:id', element: <OpportunityDetailWorkspace /> },
+  { path: '/opportunities/:id/validate', element: <OpportunityDetailWorkspace /> },
   { path: '/opportunities/:id/matching', element: <SolutionCapabilityMatchingWorkspace /> },
+  { path: '/opportunities/:id/solutions', element: <SolutionCapabilityMatchingWorkspace /> },
   { path: '/opportunities/:id/network-matching', element: <NetworkMatchingWorkspace /> },
   { path: '/opportunities/:id/introduction', element: <FounderIntroductionWorkspace /> },
   { path: '/opportunities/:id/post-introduction', element: <PostIntroductionWorkspace /> },

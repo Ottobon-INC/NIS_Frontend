@@ -7,17 +7,24 @@ import {
   Search, 
   Edit3, 
   Trash2, 
-  CheckCircle2, 
-  Users, 
-  Briefcase, 
   X, 
   Sparkles,
-  Layers
+  Layers,
+  LayoutGrid,
+  List,
+  Filter,
+  Users,
+  Briefcase,
+  CheckCircle2
 } from 'lucide-react';
 
 export const CapabilityWorkspace: React.FC = () => {
   const { data: products, isLoading, isError } = useProducts();
   const { createMutation, updateMutation, deleteMutation } = useProductMutations();
+
+  // View state
+  const [viewMode, setViewMode] = useState<'TABLE' | 'GRID'>('TABLE');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,13 +168,13 @@ export const CapabilityWorkspace: React.FC = () => {
 
   return (
     <WorkspaceShell
-      title="Products & Capabilities"
-      subtitle="Central database catalog of present products and solutions available for client matching."
+      title="Capabilities"
+      subtitle="Company capabilities for opportunity matching"
       breadcrumbs={[
         { label: 'Capabilities', path: '/capabilities' }
       ]}
       primaryAction={{
-        label: '+ Add Product',
+        label: '+ Add Capability',
         onClick: handleOpenAddModal
       }}
       isLoading={isLoading}
@@ -280,7 +287,7 @@ export const CapabilityWorkspace: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter and Search Bar */}
+        {/* Screen 13 Filter and Action Bar */}
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -290,77 +297,350 @@ export const CapabilityWorkspace: React.FC = () => {
           background: '#FFFFFF',
           padding: 'var(--space-4) var(--space-5)',
           borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)'
+          border: '1px solid var(--color-border)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
-          {/* Search Box */}
+          {/* Search Box & Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1, minWidth: '300px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              background: '#F8FAFC',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
+              width: '100%',
+              maxWidth: '340px'
+            }}>
+              <Search size={16} color="#94A3B8" />
+              <input 
+                type="text"
+                placeholder="Search capabilities..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  width: '100%',
+                  fontSize: '13px',
+                  color: 'var(--color-text-primary)'
+                }}
+              />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm('')} 
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#94A3B8' }}
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+
+            {/* Category Dropdown */}
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              style={{
+                height: '36px',
+                padding: '0 12px',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border)',
+                background: '#FFFFFF',
+                fontSize: '13px',
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat === 'ALL' ? 'All Categories' : cat}
+                </option>
+              ))}
+            </select>
+
+            <button className="btn btn-secondary" style={{ height: '36px', padding: '0 12px', fontSize: '13px' }}>
+              <Filter size={14} />
+              <span>Filter</span>
+            </button>
+          </div>
+
+          {/* View Mode Toggle: Table / Grid */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 'var(--space-2)',
-            background: '#F8FAFC',
-            padding: '8px 14px',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--color-border)',
-            width: '100%',
-            maxWidth: '360px'
+            background: '#F1F5F9',
+            padding: '3px',
+            borderRadius: '8px',
+            border: '1px solid var(--color-border)'
           }}>
-            <Search size={18} color="#94A3B8" />
-            <input 
-              type="text"
-              placeholder="Search products, keywords, capabilities..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+            <button
+              type="button"
+              onClick={() => setViewMode('TABLE')}
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                borderRadius: '6px',
                 border: 'none',
-                background: 'transparent',
-                outline: 'none',
-                width: '100%',
-                fontSize: '14px',
-                color: 'var(--color-text-primary)'
+                cursor: 'pointer',
+                background: viewMode === 'TABLE' ? '#FFFFFF' : 'transparent',
+                color: viewMode === 'TABLE' ? 'var(--color-brand-primary)' : 'var(--color-text-secondary)',
+                boxShadow: viewMode === 'TABLE' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.15s ease'
               }}
-            />
-            {searchTerm && (
-              <button 
-                onClick={() => setSearchTerm('')} 
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#94A3B8' }}
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-
-          {/* Category Tabs */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '20px',
-                  border: '1px solid',
-                  borderColor: selectedCategory === cat ? 'var(--color-brand-primary)' : 'var(--color-border)',
-                  background: selectedCategory === cat ? 'var(--color-brand-primary)' : '#FFFFFF',
-                  color: selectedCategory === cat ? '#FFFFFF' : 'var(--color-text-secondary)',
-                  fontSize: '12px',
-                  fontWeight: selectedCategory === cat ? 600 : 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {cat === 'ALL' ? 'All Products' : cat}
-              </button>
-            ))}
+            >
+              <List size={14} />
+              <span>Table</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('GRID')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                background: viewMode === 'GRID' ? '#FFFFFF' : 'transparent',
+                color: viewMode === 'GRID' ? 'var(--color-brand-primary)' : 'var(--color-text-secondary)',
+                boxShadow: viewMode === 'GRID' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <LayoutGrid size={14} />
+              <span>Grid</span>
+            </button>
           </div>
         </div>
 
-        {/* Product Cards Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
-          gap: 'var(--space-6)'
-        }}>
+        {/* Category Segmented Pills */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setSelectedCategory(cat)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-full)',
+                border: `1px solid ${selectedCategory === cat ? 'var(--color-brand-primary)' : 'var(--color-border)'}`,
+                background: selectedCategory === cat ? 'var(--color-brand-primary)' : '#FFFFFF',
+                color: selectedCategory === cat ? '#FFFFFF' : 'var(--color-text-secondary)',
+                fontSize: '12px',
+                fontWeight: selectedCategory === cat ? 600 : 500,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {cat === 'ALL' ? `All Capabilities (${products?.length || 0})` : cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Screen 13 View Mode: Table vs Grid */}
+        {viewMode === 'TABLE' ? (
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--color-border)',
+            overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--color-border)' }}>
+                  <th style={{ width: '40px', padding: '12px 16px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(filteredProducts.map(p => p.id));
+                        else setSelectedIds([]);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Name</th>
+                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Category</th>
+                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Description</th>
+                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Match Count</th>
+                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</th>
+                  <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map((product) => {
+                  const isChecked = selectedIds.includes(product.id);
+                  const features = parseFeaturesList(product.features);
+                  const matchCount = Math.max(features.length, 3);
+
+                  return (
+                    <tr
+                      key={product.id}
+                      style={{
+                        borderBottom: '1px solid var(--color-border)',
+                        background: isChecked ? '#F8FAFC' : '#FFFFFF',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { if (!isChecked) e.currentTarget.style.backgroundColor = '#F8FAFC'; }}
+                      onMouseLeave={(e) => { if (!isChecked) e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                    >
+                      <td style={{ padding: '16px' }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) setSelectedIds(selectedIds.filter(id => id !== product.id));
+                            else setSelectedIds([...selectedIds, product.id]);
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '34px',
+                            height: '34px',
+                            borderRadius: '8px',
+                            background: '#EFF6FF',
+                            color: '#2563EB',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <Package size={17} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '14px' }}>
+                              {product.name}
+                            </div>
+                            {product.tagline && (
+                              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                                {product.tagline}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          padding: '3px 10px',
+                          borderRadius: 'var(--radius-full)',
+                          background: '#EFF6FF',
+                          color: '#1D4ED8',
+                          border: '1px solid #BFDBFE'
+                        }}>
+                          {product.category || 'Technology'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px', maxWidth: '340px' }}>
+                        <p style={{
+                          margin: 0,
+                          fontSize: '13px',
+                          color: 'var(--color-text-secondary)',
+                          lineHeight: '1.4',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}>
+                          {product.description}
+                        </p>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          background: '#F1F5F9',
+                          color: '#475569'
+                        }}>
+                          {matchCount} Matches
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          padding: '3px 10px',
+                          borderRadius: 'var(--radius-full)',
+                          background: product.status === 'ACTIVE' ? '#ECFDF5' : '#F1F5F9',
+                          color: product.status === 'ACTIVE' ? '#047857' : '#475569',
+                          border: `1px solid ${product.status === 'ACTIVE' ? '#A7F3D0' : '#E2E8F0'}`
+                        }}>
+                          {product.status || 'ACTIVE'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(product)}
+                            style={{
+                              background: '#FFFFFF',
+                              border: '1px solid var(--color-border)',
+                              color: '#475569',
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <Edit3 size={13} />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(product.id, product.name)}
+                            style={{
+                              background: '#FFFFFF',
+                              border: '1px solid var(--color-border)',
+                              color: '#DC2626',
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* Product Cards Grid */
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
+            gap: 'var(--space-6)'
+          }}>
           {filteredProducts.map((product) => {
             const features = parseFeaturesList(product.features);
 
@@ -542,6 +822,7 @@ export const CapabilityWorkspace: React.FC = () => {
             );
           })}
         </div>
+        )}
 
       </div>
 

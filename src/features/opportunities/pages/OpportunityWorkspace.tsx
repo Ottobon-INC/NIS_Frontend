@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { 
+  Search, 
+  Download, 
+  List, 
+  Grid,
+  ChevronRight,
+  CheckSquare,
+  Square,
+  Building2
+} from 'lucide-react';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useOpportunitySearch, useCreateOpportunity, useDeriveOpportunity } from '../../../hooks/useOpportunities';
 import { useContacts } from '../../../hooks/useContacts';
@@ -7,7 +17,10 @@ import { TrustBadge } from '../../../components/intelligence/TrustBadge';
 
 export const OpportunityWorkspace: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'CANDIDATE' | 'VALIDATED'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'IN_ANALYSIS' | 'VALIDATED' | 'IN_PROGRESS' | 'CLOSED'>('ALL');
+  const [displayFormat, setDisplayFormat] = useState<'table' | 'grid'>('table');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<'title' | 'company' | 'updated'>('updated');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creationMode, setCreationMode] = useState<'DERIVE' | 'MANUAL'>('DERIVE');
 
@@ -40,24 +53,88 @@ export const OpportunityWorkspace: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   // Live PostgreSQL-backed search query
-  const isFiltering = !!debouncedSearchQuery || selectedStatus !== 'ALL' || selectedCategory !== 'ALL' || minConfidence > 0;
+  const isFiltering = !!debouncedSearchQuery || selectedCategory !== 'ALL' || minConfidence > 0;
 
   const { data: searchData, isLoading, isError } = useOpportunitySearch({
     q: debouncedSearchQuery || undefined,
-    status: selectedStatus === 'ALL' ? undefined : selectedStatus,
     opportunity_type: selectedCategory === 'ALL' ? undefined : selectedCategory,
     min_confidence: minConfidence > 0 ? minConfidence : undefined,
   });
 
-  const opportunities = searchData?.results || [];
-  const totalCount = searchData?.total ?? 0;
+  const allOpps = useMemo(() => searchData?.results || [], [searchData]);
+  const inAnalysisCount = useMemo(() => allOpps.filter(o => o.status === 'CANDIDATE' || (o.status as string) === 'IN_ANALYSIS').length, [allOpps]);
+  const validatedCount = useMemo(() => allOpps.filter(o => o.status === 'VALIDATED').length, [allOpps]);
+  const inProgressCount = useMemo(() => allOpps.filter(o => o.status === 'SOLUTION_MATCHING' || o.status === 'PATH_DEFINED' || o.status === 'PIPELINE' || (o.status as string) === 'IN_PROGRESS').length, [allOpps]);
+  const closedCount = useMemo(() => allOpps.filter(o => o.status === 'OUTCOME' || o.status === 'REJECTED' || o.status === 'EXPIRED' || (o.status as string) === 'CLOSED' || (o.status as string) === 'ARCHIVED').length, [allOpps]);
+  const totalCount = searchData?.total ?? allOpps.length;
+
+  const opportunities = useMemo(() => {
+    let list = allOpps;
+    if (activeTab === 'IN_ANALYSIS') {
+      list = allOpps.filter(o => o.status === 'CANDIDATE' || (o.status as string) === 'IN_ANALYSIS');
+    } else if (activeTab === 'VALIDATED') {
+      list = allOpps.filter(o => o.status === 'VALIDATED');
+    } else if (activeTab === 'IN_PROGRESS') {
+      list = allOpps.filter(o => o.status === 'SOLUTION_MATCHING' || o.status === 'PATH_DEFINED' || o.status === 'PIPELINE' || (o.status as string) === 'IN_PROGRESS');
+    } else if (activeTab === 'CLOSED') {
+      list = allOpps.filter(o => o.status === 'OUTCOME' || o.status === 'REJECTED' || o.status === 'EXPIRED' || (o.status as string) === 'CLOSED' || (o.status as string) === 'ARCHIVED');
+    }
+
+    return [...list].sort((a, b) => {
+      if (sortBy === 'title') return a.title.localeCompare(b.title);
+      if (sortBy === 'company') return a.companyName.localeCompare(b.companyName);
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }, [allOpps, activeTab, sortBy]);
+
 
   const handleClearFilters = () => {
     setSearchQuery('');
     setDebouncedSearchQuery('');
-    setSelectedStatus('ALL');
+    setActiveTab('ALL');
     setSelectedCategory('ALL');
     setMinConfidence(0);
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === opportunities.length && opportunities.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(opportunities.map(o => o.id)));
+    }
+  };
+
+  const handleToggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const handleExportCSV = () => {
+    const listToExport = selectedIds.size > 0 
+      ? opportunities.filter(o => selectedIds.has(o.id))
+      : opportunities;
+    const headers = ['Title', 'Company', 'Stage', 'Type', 'Confidence', 'Problem', 'Requirement', 'Updated'];
+    const rows = listToExport.map(o => [
+      `"${(o.title || '').replace(/"/g, '""')}"`,
+      `"${(o.companyName || '').replace(/"/g, '""')}"`,
+      `"${(o.status || '').replace(/"/g, '""')}"`,
+      `"${(o.opportunityType || '').replace(/"/g, '""')}"`,
+      o.confidence,
+      `"${(o.problem || '').replace(/"/g, '""')}"`,
+      `"${(o.requirement || '').replace(/"/g, '""')}"`,
+      o.updatedAt
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `opportunities_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const { data: contactsList, isLoading: isContactsLoading } = useContacts();
@@ -132,13 +209,13 @@ export const OpportunityWorkspace: React.FC = () => {
 
   return (
     <WorkspaceShell
-      title="Opportunity Intelligence"
-      subtitle="Identify, review, and define business opportunities derived from verified contacts and trusted context."
+      title="Opportunities"
+      subtitle="Business opportunities from your network"
       breadcrumbs={[
         { label: 'Opportunities', path: '/opportunities' }
       ]}
       primaryAction={{
-        label: '+ New Opportunity',
+        label: '+ Add Opportunity',
         onClick: () => {
           setFormError(null);
           setShowCreateModal(true);
@@ -153,59 +230,91 @@ export const OpportunityWorkspace: React.FC = () => {
           : 'No commercial opportunities detected. Establish more Trusted Context or create an opportunity.'
       }
     >
-      {/* Live Search & Facet Filter Bar */}
+      {/* Screen 4: Segmented Tabs */}
       <div style={{
-        background: '#ffffff',
-        padding: 'var(--space-5)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--color-border)',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-        marginBottom: 'var(--space-6)',
         display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-4)'
+        alignItems: 'center',
+        gap: '4px',
+        borderBottom: '1px solid #E2E8F0',
+        marginBottom: '20px',
+        paddingBottom: '0'
       }}>
-        {/* Search Input Field */}
-        <div style={{ position: 'relative', width: '100%' }}>
-          <div style={{
-            position: 'absolute',
-            left: '14px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: 'var(--color-text-secondary)',
-            pointerEvents: 'none',
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </div>
+        {[
+          { key: 'ALL', label: 'All Opportunities', count: totalCount },
+          { key: 'IN_ANALYSIS', label: 'In Analysis', count: inAnalysisCount },
+          { key: 'VALIDATED', label: 'Validated', count: validatedCount },
+          { key: 'IN_PROGRESS', label: 'In Progress', count: inProgressCount },
+          { key: 'CLOSED', label: 'Closed', count: closedCount },
+        ].map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as any)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: isActive ? 600 : 500,
+                color: isActive ? '#2563EB' : '#64748B',
+                borderBottom: isActive ? '2px solid #2563EB' : '2px solid transparent',
+                marginBottom: '-1px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>{tab.label}</span>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '2px 7px',
+                borderRadius: '10px',
+                background: isActive ? '#EFF6FF' : '#F1F5F9',
+                color: isActive ? '#1D4ED8' : '#64748B'
+              }}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Screen 4: Filter & Action Toolbar */}
+      <div style={{
+        background: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        borderRadius: '12px',
+        padding: '14px 18px',
+        marginBottom: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+      }}>
+        {/* Left: Search input */}
+        <div style={{ position: 'relative', minWidth: '320px', flex: '1 1 320px' }}>
+          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
           <input
             type="text"
-            placeholder="Search live opportunities across problem statements, requirements, companies, or champions..."
+            placeholder="Search opportunities by title, problem, company..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               width: '100%',
-              padding: '11px 36px 11px 40px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border)',
-              fontSize: '14px',
+              padding: '9px 12px 9px 36px',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+              fontSize: '13px',
+              background: '#F8FAFC',
+              color: '#0F172A',
               outline: 'none',
-              boxSizing: 'border-box',
-              background: '#f8fafc',
-              color: '#0f172a',
-              transition: 'border-color 0.15s ease, background 0.15s ease'
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = 'var(--color-brand-primary)';
-              e.target.style.background = '#ffffff';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = 'var(--color-border)';
-              if (!e.target.value) e.target.style.background = '#f8fafc';
+              boxSizing: 'border-box'
             }}
           />
           {searchQuery && (
@@ -213,346 +322,562 @@ export const OpportunityWorkspace: React.FC = () => {
               onClick={() => setSearchQuery('')}
               style={{
                 position: 'absolute',
-                right: '12px',
+                right: '10px',
                 top: '50%',
                 transform: 'translateY(-50%)',
                 background: 'none',
                 border: 'none',
-                color: 'var(--color-text-secondary)',
+                color: '#94A3B8',
                 cursor: 'pointer',
-                fontSize: '18px',
-                padding: '2px',
-                lineHeight: 1
+                fontSize: '16px'
               }}
-              title="Clear search"
             >
               ×
             </button>
           )}
         </div>
 
-        {/* Faceted Filter Toolbar */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 'var(--space-3)',
-          paddingTop: 'var(--space-2)'
-        }}>
-          {/* Status Tabs */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            {(['ALL', 'CANDIDATE', 'VALIDATED'] as const).map((st) => {
-              const isActive = selectedStatus === st;
-              const label = st === 'ALL' ? 'All Opportunities' : st === 'CANDIDATE' ? 'Review Pending (Candidate)' : 'Validated';
-              return (
-                <button
-                  key={st}
-                  onClick={() => setSelectedStatus(st)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    border: isActive ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
-                    background: isActive ? 'var(--color-brand-primary)' : '#fff',
-                    color: isActive ? '#fff' : 'var(--color-text-secondary)',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+        {/* Right: Facet filters, sorting, export, and table/grid view */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Category Dropdown */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+              fontSize: '13px',
+              background: '#FFFFFF',
+              color: '#334155',
+              fontWeight: 500,
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="ALL">All Categories</option>
+            <option value="JOB_OPENING">Job Openings</option>
+            <option value="ENTERPRISE_AI_PILOT">Enterprise AI Pilot</option>
+            <option value="STRATEGIC_INTELLIGENCE">Strategic Intelligence</option>
+            <option value="PREDICTIVE_LOGISTICS">Predictive Logistics</option>
+            <option value="DATA_MODERNIZATION">Data Modernization</option>
+            <option value="Digital Transformation">Digital Transformation</option>
+          </select>
 
-          {/* Facet Controls */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Category Filter */}
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+          {/* Confidence Filter */}
+          <select
+            value={minConfidence}
+            onChange={(e) => setMinConfidence(Number(e.target.value))}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+              fontSize: '13px',
+              background: '#FFFFFF',
+              color: '#334155',
+              fontWeight: 500,
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value={0}>Any Confidence</option>
+            <option value={50}>Confidence ≥ 50%</option>
+            <option value={70}>Confidence ≥ 70%</option>
+            <option value={85}>Confidence ≥ 85%</option>
+          </select>
+
+          {/* Sort By */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+              fontSize: '13px',
+              background: '#FFFFFF',
+              color: '#334155',
+              fontWeight: 500,
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="updated">Sort: Recently Updated</option>
+            <option value="title">Sort: Title</option>
+            <option value="company">Sort: Company</option>
+          </select>
+
+          {/* Reset Filters if active */}
+          {isFiltering && (
+            <button
+              onClick={handleClearFilters}
               style={{
-                padding: '6px 12px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--color-border)',
-                fontSize: 'var(--font-size-sm)',
-                background: '#fff',
-                color: selectedCategory !== 'ALL' ? 'var(--color-brand-primary)' : 'var(--color-text-primary)',
-                fontWeight: selectedCategory !== 'ALL' ? 600 : 400,
-                cursor: 'pointer'
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px dashed #CBD5E1',
+                background: '#F8FAFC',
+                color: '#64748B',
+                fontSize: '13px',
+                cursor: 'pointer',
+                fontWeight: 500
               }}
             >
-              <option value="ALL">All Categories</option>
-              <option value="JOB_OPENING">💼 Job Openings (Scraped)</option>
-              <option value="ENTERPRISE_AI_PILOT">Enterprise AI Pilot</option>
-              <option value="STRATEGIC_INTELLIGENCE">Strategic Intelligence</option>
-              <option value="PREDICTIVE_LOGISTICS">Predictive Logistics</option>
-              <option value="DATA_MODERNIZATION">Data Modernization</option>
-              <option value="Digital Transformation">Digital Transformation</option>
-            </select>
-
-            {/* Minimum Confidence Filter */}
-            <select
-              value={minConfidence}
-              onChange={(e) => setMinConfidence(Number(e.target.value))}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--color-border)',
-                fontSize: 'var(--font-size-sm)',
-                background: '#fff',
-                color: minConfidence > 0 ? 'var(--color-brand-primary)' : 'var(--color-text-primary)',
-                fontWeight: minConfidence > 0 ? 600 : 400,
-                cursor: 'pointer'
-              }}
-            >
-              <option value={0}>Any Confidence</option>
-              <option value={50}>Confidence ≥ 50%</option>
-              <option value={70}>Confidence ≥ 70%</option>
-              <option value={85}>Confidence ≥ 85%</option>
-            </select>
-
-            {/* Reset Filters */}
-            {isFiltering && (
-              <button
-                onClick={handleClearFilters}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px dashed #cbd5e1',
-                  background: '#f8fafc',
-                  color: '#64748b',
-                  fontSize: 'var(--font-size-sm)',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                  transition: 'all 0.15s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#1e293b';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#64748b';
-                }}
-              >
-                Reset Filters
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Results Metadata Counter */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: 'var(--color-text-secondary)', borderTop: '1px solid #f1f5f9', paddingTop: 'var(--space-2)' }}>
-          <span>
-            Showing <strong>{opportunities.length}</strong> of <strong>{totalCount}</strong> opportunities
-            {debouncedSearchQuery ? ` matching "${debouncedSearchQuery}"` : ''}
-          </span>
-          {debouncedSearchQuery && (
-            <span style={{ fontSize: '12px', color: '#059669', fontWeight: 600 }}>
-              Live SQL Relevance Ranked
-            </span>
+              Reset Filters
+            </button>
           )}
+
+          {/* Export Button */}
+          <button
+            onClick={handleExportCSV}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+              background: '#FFFFFF',
+              color: '#334155',
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
+            title="Export filtered opportunities to CSV"
+          >
+            <Download size={14} />
+            <span>Export</span>
+          </button>
+
+          {/* Table / Grid Switcher */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            background: '#F1F5F9',
+            borderRadius: '8px',
+            padding: '3px'
+          }}>
+            <button
+              onClick={() => setDisplayFormat('table')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '5px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: displayFormat === 'table' ? '#FFFFFF' : 'transparent',
+                color: displayFormat === 'table' ? '#0F172A' : '#64748B',
+                boxShadow: displayFormat === 'table' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 600
+              }}
+            >
+              <List size={14} />
+              <span>Table</span>
+            </button>
+            <button
+              onClick={() => setDisplayFormat('grid')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '5px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: displayFormat === 'grid' ? '#FFFFFF' : 'transparent',
+                color: displayFormat === 'grid' ? '#0F172A' : '#64748B',
+                boxShadow: displayFormat === 'grid' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 600
+              }}
+            >
+              <Grid size={14} />
+              <span>Grid</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Opportunity Cards Grid */}
-      {opportunities.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 'var(--space-6)' }}>
+      {/* Selected Action Pill */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: '#EFF6FF',
+          border: '1px solid #BFDBFE',
+          borderRadius: '8px',
+          padding: '10px 16px',
+          marginBottom: '16px',
+          color: '#1E40AF',
+          fontSize: '13px',
+          fontWeight: 500
+        }}>
+          <span>{selectedIds.size} of {opportunities.length} opportunities selected</span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleExportCSV}
+              style={{
+                padding: '4px 12px',
+                borderRadius: '6px',
+                border: '1px solid #93C5FD',
+                background: '#FFFFFF',
+                color: '#1D4ED8',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Export Selected
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: 'transparent',
+                color: '#1E40AF',
+                fontSize: '12px',
+                cursor: 'pointer'
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Screen 4: Enterprise Data Table View */}
+      {displayFormat === 'table' && (
+        <div style={{
+          background: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
+        }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th style={{ width: '40px', padding: '12px 16px' }}>
+                    <div 
+                      onClick={handleToggleSelectAll} 
+                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                      {selectedIds.size === opportunities.length && opportunities.length > 0 ? (
+                        <CheckSquare size={16} color="#2563EB" />
+                      ) : (
+                        <Square size={16} color="#94A3B8" />
+                      )}
+                    </div>
+                  </th>
+                  <th style={{ padding: '12px 16px' }}>Title & Problem Statement</th>
+                  <th style={{ padding: '12px 16px' }}>Company / Source</th>
+                  <th style={{ padding: '12px 16px' }}>Stage</th>
+                  <th style={{ padding: '12px 16px' }}>Priority</th>
+                  <th style={{ padding: '12px 16px' }}>Confidence</th>
+                  <th style={{ padding: '12px 16px' }}>Updated</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {opportunities.map((opp) => {
+                  const isSelected = selectedIds.has(opp.id);
+                  
+                  // Stage config
+                  let stageBg = '#EFF6FF';
+                  let stageColor = '#1D4ED8';
+                  let stageBorder = '#DBEAFE';
+                  let stageLabel = 'In Analysis';
+                  if (opp.status === 'VALIDATED') {
+                    stageBg = '#ECFDF5';
+                    stageColor = '#047857';
+                    stageBorder = '#A7F3D0';
+                    stageLabel = 'Validated';
+                  } else if (opp.status === 'SOLUTION_MATCHING' || opp.status === 'PATH_DEFINED' || opp.status === 'PIPELINE' || (opp.status as string) === 'IN_PROGRESS') {
+                    stageBg = '#FFF7ED';
+                    stageColor = '#C2410C';
+                    stageBorder = '#FFEDD5';
+                    stageLabel = 'In Progress';
+                  } else if (opp.status === 'OUTCOME' || opp.status === 'REJECTED' || opp.status === 'EXPIRED' || (opp.status as string) === 'CLOSED' || (opp.status as string) === 'ARCHIVED') {
+                    stageBg = '#F1F5F9';
+                    stageColor = '#475569';
+                    stageBorder = '#E2E8F0';
+                    stageLabel = 'Closed';
+                  }
+
+                  // Priority config based on confidence
+                  let priorityLabel = 'Low';
+                  let prioBg = '#F1F5F9';
+                  let prioColor = '#64748B';
+                  let prioBorder = '#E2E8F0';
+                  if (opp.confidence >= 85) {
+                    priorityLabel = 'High';
+                    prioBg = '#FEF2F2';
+                    prioColor = '#B91C1C';
+                    prioBorder = '#FEE2E2';
+                  } else if (opp.confidence >= 60) {
+                    priorityLabel = 'Medium';
+                    prioBg = '#FEF3C7';
+                    prioColor = '#B45309';
+                    prioBorder = '#FDE68A';
+                  }
+
+                  return (
+                    <tr
+                      key={opp.id}
+                      onClick={() => navigate(`/opportunities/${opp.id}`)}
+                      style={{
+                        borderBottom: '1px solid #F1F5F9',
+                        cursor: 'pointer',
+                        background: isSelected ? '#F0F9FF' : '#FFFFFF',
+                        transition: 'background 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) e.currentTarget.style.background = '#F8FAFC';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) e.currentTarget.style.background = '#FFFFFF';
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <td style={{ padding: '14px 16px' }} onClick={(e) => handleToggleSelect(opp.id, e)}>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          {isSelected ? (
+                            <CheckSquare size={16} color="#2563EB" />
+                          ) : (
+                            <Square size={16} color="#CBD5E1" />
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Title & Problem Preview */}
+                      <td style={{ padding: '14px 16px', maxWidth: '340px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '14px' }}>
+                            {opp.title}
+                          </span>
+                          <span style={{
+                            color: '#64748B',
+                            fontSize: '12px',
+                            lineHeight: '1.4',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 1,
+                            WebkitBoxOrient: 'vertical'
+                          }}>
+                            {opp.problem}
+                          </span>
+                          {opp.opportunityType === 'JOB_OPENING' && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              width: 'fit-content',
+                              marginTop: '2px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: '#4338CA',
+                              background: '#F5F3FF',
+                              border: '1px solid #DDD6FE',
+                              padding: '1px 6px',
+                              borderRadius: '4px'
+                            }}>
+                              Job Opening
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Company / Source */}
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: '#1E293B' }}>
+                            <Building2 size={14} color="#64748B" />
+                            <span>{opp.companyName}</span>
+                          </div>
+                          {opp.personName && (
+                            <span style={{ color: '#64748B', fontSize: '12px', paddingLeft: '20px' }}>
+                              via {opp.personName}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Stage Badge */}
+                      <td style={{ padding: '14px 16px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '3px 10px',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          background: stageBg,
+                          color: stageColor,
+                          border: `1px solid ${stageBorder}`,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {stageLabel}
+                        </span>
+                      </td>
+
+                      {/* Priority Badge */}
+                      <td style={{ padding: '14px 16px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '3px 10px',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          background: prioBg,
+                          color: prioColor,
+                          border: `1px solid ${prioBorder}`,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {priorityLabel} Priority
+                        </span>
+                      </td>
+
+                      {/* Confidence */}
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{
+                            width: '42px',
+                            height: '6px',
+                            background: '#E2E8F0',
+                            borderRadius: '3px',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              width: `${opp.confidence}%`,
+                              height: '100%',
+                              background: opp.confidence >= 80 ? '#10B981' : opp.confidence >= 60 ? '#F59E0B' : '#94A3B8',
+                              borderRadius: '3px'
+                            }} />
+                          </div>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+                            {opp.confidence}%
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Updated Date */}
+                      <td style={{ padding: '14px 16px', color: '#64748B', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                        {new Date(opp.updatedAt).toLocaleDateString()}
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          color: '#2563EB',
+                          fontWeight: 600,
+                          fontSize: '12px'
+                        }}>
+                          View Details
+                          <ChevronRight size={14} />
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Screen 4: Grid Cards View */}
+      {displayFormat === 'grid' && opportunities.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
           {opportunities.map(opp => (
             <div 
               key={opp.id} 
               onClick={() => navigate(`/opportunities/${opp.id}`)}
               style={{ 
-                background: '#fff', 
-                padding: 'var(--space-6)', 
-                borderRadius: 'var(--radius-lg)', 
-                border: '1px solid var(--color-border)', 
+                background: '#FFFFFF', 
+                padding: '20px', 
+                borderRadius: '12px', 
+                border: '1px solid #E2E8F0', 
                 cursor: 'pointer', 
                 display: 'flex', 
                 flexDirection: 'column', 
-                gap: 'var(--space-4)', 
+                gap: '14px', 
                 transition: 'all 0.2s ease', 
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)' 
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)' 
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-brand-primary)';
+                e.currentTarget.style.borderColor = '#2563EB';
                 e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-border)';
-                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                e.currentTarget.style.borderColor = '#E2E8F0';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                    <h3 className="card-title" style={{ margin: 0, fontSize: '16px' }}>{opp.title}</h3>
-                    {debouncedSearchQuery && opp.relevanceScore !== undefined && (
-                      <span style={{
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        background: opp.relevanceScore >= 80 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.12)',
-                        color: opp.relevanceScore >= 80 ? '#047857' : '#1d4ed8',
-                        border: opp.relevanceScore >= 80 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        Relevance {opp.relevanceScore}%
-                      </span>
-                    )}
-                  </div>
-                  <p className="body-text text-secondary" style={{ margin: 0, fontSize: '13px' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>{opp.title}</h3>
+                  <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: '#64748B' }}>
                     {opp.personName || 'Unassigned Executive'} · <strong>{opp.companyName}</strong>
                   </p>
                 </div>
-                {opp.status === 'CANDIDATE' ? (
-                  <span className="labels" style={{ color: '#b45309', background: '#fef3c7', padding: '3px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid #fde68a', whiteSpace: 'nowrap', fontSize: '11px', fontWeight: 700 }}>
-                    REVIEW PENDING
-                  </span>
-                ) : opp.status === 'VALIDATED' ? (
-                  <span className="labels" style={{ color: '#047857', background: '#ecfdf5', padding: '3px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid #a7f3d0', whiteSpace: 'nowrap', fontSize: '11px', fontWeight: 700 }}>
+                {opp.status === 'VALIDATED' ? (
+                  <span style={{ color: '#047857', background: '#ECFDF5', padding: '3px 8px', borderRadius: '6px', border: '1px solid #A7F3D0', whiteSpace: 'nowrap', fontSize: '11px', fontWeight: 700 }}>
                     VALIDATED
                   </span>
                 ) : (
-                  <span className="labels" style={{ color: '#475569', background: '#f1f5f9', padding: '3px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid #cbd5e1', whiteSpace: 'nowrap', fontSize: '11px', fontWeight: 700 }}>
-                    {opp.status}
+                  <span style={{ color: '#1D4ED8', background: '#EFF6FF', padding: '3px 8px', borderRadius: '6px', border: '1px solid #DBEAFE', whiteSpace: 'nowrap', fontSize: '11px', fontWeight: 700 }}>
+                    IN ANALYSIS
                   </span>
                 )}
               </div>
 
-              {/* Match Reasons Chips */}
-              {debouncedSearchQuery && opp.matchReasons && opp.matchReasons.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {opp.matchReasons.map((reason, idx) => (
-                    <span key={idx} style={{
-                      fontSize: '11px',
-                      padding: '2px 7px',
-                      borderRadius: '4px',
-                      background: '#f1f5f9',
-                      color: '#475569',
-                      border: '1px solid #e2e8f0',
-                      fontWeight: 500
-                    }}>
-                      {reason}
-                    </span>
-                  ))}
-                </div>
-              )}
-
               <div>
-                <p className="labels text-secondary" style={{ margin: '0 0 var(--space-1) 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600 }}>
                   Need / Problem
                 </p>
-                <p className="body-text" style={{ margin: 0, fontSize: '13px', lineHeight: '1.4', color: '#1e293b' }}>
+                <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.4', color: '#1E293B' }}>
                   {opp.problem}
                 </p>
               </div>
 
               <div>
-                <p className="labels text-secondary" style={{ margin: '0 0 var(--space-1) 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600 }}>
                   Requirement
                 </p>
-                <p className="body-text" style={{ margin: 0, fontSize: '13px', lineHeight: '1.4', color: '#334155' }}>
+                <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.4', color: '#334155' }}>
                   {opp.requirement}
                 </p>
               </div>
 
-              {/* Direct Job Link display for Job Openings */}
-              {(opp.opportunityType === 'JOB_OPENING' || opp.applyUrl || (opp.supportingEvidenceIds && opp.supportingEvidenceIds.some(u => u.startsWith('http')))) && (() => {
-                const effectiveApplyUrl = opp.applyUrl || (opp.supportingEvidenceIds && opp.supportingEvidenceIds.find(u => u.startsWith('http')));
-                if (!effectiveApplyUrl) return null;
-                return (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 10px',
-                    background: '#f8fafc',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '12px'
-                  }}>
-                    <span style={{ fontWeight: 600, color: '#4338ca', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      🔗 Job Link:
-                    </span>
-                    <a
-                      href={effectiveApplyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        color: '#1d4ed8',
-                        textDecoration: 'underline',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        flex: 1
-                      }}
-                      title={effectiveApplyUrl}
-                    >
-                      {effectiveApplyUrl}
-                    </a>
-                  </div>
-                );
-              })()}
-
-              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <TrustBadge level={opp.status === 'VALIDATED' ? 'CONFIRMED' : 'INFERENCE'} />
-                  <span className="metadata text-secondary" style={{ fontSize: '12px' }}>
+                  <span style={{ fontSize: '12px', color: '#64748B' }}>
                     Confidence {opp.confidence}%
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {(() => {
-                    const effectiveApplyUrl = opp.applyUrl || (opp.supportingEvidenceIds && opp.supportingEvidenceIds.find(u => u.startsWith('http')));
-                    if (!effectiveApplyUrl) return null;
-                    return (
-                      <a
-                        href={effectiveApplyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          fontSize: '11px',
-                          color: '#ffffff',
-                          background: '#4338ca',
-                          padding: '4px 10px',
-                          borderRadius: '4px',
-                          fontWeight: 600,
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#3730a3';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = '#4338ca';
-                        }}
-                      >
-                        Apply on Job Board ↗
-                      </a>
-                    );
-                  })()}
                   <span style={{
                     fontSize: '11px',
-                    color: opp.opportunityType === 'JOB_OPENING' ? '#4338ca' : '#64748b',
-                    background: opp.opportunityType === 'JOB_OPENING' ? '#f5f3ff' : '#f8fafc',
+                    color: opp.opportunityType === 'JOB_OPENING' ? '#4338CA' : '#64748B',
+                    background: opp.opportunityType === 'JOB_OPENING' ? '#F5F3FF' : '#F8FAFC',
                     padding: '2px 6px',
                     borderRadius: '4px',
-                    border: opp.opportunityType === 'JOB_OPENING' ? '1px solid #ddd6fe' : '1px solid #e2e8f0',
+                    border: opp.opportunityType === 'JOB_OPENING' ? '1px solid #DDD6FE' : '1px solid #E2E8F0',
                     fontWeight: opp.opportunityType === 'JOB_OPENING' ? 600 : 400
                   }}>
-                    {opp.opportunityType === 'JOB_OPENING' ? '💼 Job Opening' : opp.opportunityType}
+                    {opp.opportunityType === 'JOB_OPENING' ? 'Job Opening' : opp.opportunityType}
                   </span>
-                  <div className="metadata text-secondary" style={{ fontSize: '12px' }}>
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>
                     {new Date(opp.updatedAt).toLocaleDateString()}
                   </div>
                 </div>

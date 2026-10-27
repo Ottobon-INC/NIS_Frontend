@@ -1,14 +1,24 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
+import { 
+  Search, 
+  ArrowUpDown, 
+  Download, 
+  Plus, 
+  List, 
+  Grid, 
+  Trash2
+} from 'lucide-react';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useContacts } from '../../../hooks/useContacts';
-import { contactsApi } from '../../../services/api/contacts.api';
+import { contactsApi, type ContactOverview } from '../../../services/api/contacts.api';
 import { getAuthToken } from '../../../services/api/core/client.ts';
 import { networkApi } from '../../../services/api/network.api';
 import { NetworkGraphCanvas } from '../../network/components/NetworkGraphCanvas';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 
 // ── CSV Import Modal ──────────────────────────────────────────────────────────
 interface ImportResult {
@@ -167,8 +177,14 @@ export const PeopleWorkspace: React.FC = () => {
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [actionToast, setActionToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [showImport, setShowImport] = useState(false);
-  const [viewMode, setViewMode] = useState<'accepted' | 'pending' | 'all' | 'graph'>('accepted');
+  const [viewMode, setViewMode] = useState<'all' | 'network' | 'companies' | 'pending' | 'graph'>('all');
+  const [displayFormat, setDisplayFormat] = useState<'table' | 'grid'>('table');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<'name' | 'company' | 'activity'>('name');
   const [typeFilter, setTypeFilter] = useState<'all' | 'targets' | 'network'>('all');
+
 
   // Network graph view state
   const [graphSelectedNodeId, setGraphSelectedNodeId] = useState<string | null>(null);
@@ -258,28 +274,57 @@ export const PeopleWorkspace: React.FC = () => {
 
   const query = searchParams.get('q')?.toLowerCase() || '';
 
+  // Sanitize out non-human web scraper artifacts (e.g. login wall page titles like "Sign in to your Zoho People account")
+  const isWebScraperArtifact = (c: ContactOverview) => {
+    const text = `${c.name || ''} ${c.title || ''} ${c.company || ''}`.toLowerCase();
+    const junkPatterns = [
+      'sign in to', 'log in to', 'login to', 'zoho people',
+      '404 not found', 'access denied', 'robot verification', 'cookie policy'
+    ];
+    return junkPatterns.some(pattern => text.includes(pattern));
+  };
+
   // Active (non-archived) contacts
   const activeContacts = React.useMemo(() => {
-    return (contacts || []).filter(c => c.card_status !== 'ARCHIVED');
+    return (contacts || []).filter(c => c.card_status !== 'ARCHIVED' && !isWebScraperArtifact(c));
   }, [contacts]);
 
-  const acceptedContacts = React.useMemo(() => {
-    return activeContacts.filter(c => Boolean(c.founder_reviewed));
-  }, [activeContacts]);
 
   const pendingContacts = React.useMemo(() => {
     return activeContacts.filter(c => !c.founder_reviewed);
   }, [activeContacts]);
 
-  const acceptedCount = acceptedContacts.length;
+  const networkContacts = React.useMemo(() => {
+    return activeContacts.filter(c => c.contact_type === 'BHANU_CONNECTION' || Boolean(c.founder_reviewed));
+  }, [activeContacts]);
+
+  const companiesList = React.useMemo(() => {
+    const comps = new Set<string>();
+    activeContacts.forEach(c => {
+      const comp = (c.company || '').trim();
+      if (comp) comps.add(comp);
+    });
+    return Array.from(comps);
+  }, [activeContacts]);
+
   const pendingCount = pendingContacts.length;
+  const networkCount = networkContacts.length;
+  const companiesCount = companiesList.length;
   const totalCount = activeContacts.length;
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim().toLowerCase());
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   const currentTabBaseList = React.useMemo(() => {
-    if (viewMode === 'accepted') return acceptedContacts;
+    if (viewMode === 'network') return networkContacts;
+    if (viewMode === 'companies') return activeContacts.filter(c => Boolean(c.company));
     if (viewMode === 'pending') return pendingContacts;
     return activeContacts;
-  }, [viewMode, acceptedContacts, pendingContacts, activeContacts]);
+  }, [viewMode, networkContacts, activeContacts, pendingContacts]);
 
   const filteredContacts = React.useMemo(() => {
     let list = currentTabBaseList;
@@ -289,13 +334,58 @@ export const PeopleWorkspace: React.FC = () => {
       list = list.filter(c => c.contact_type === 'BHANU_CONNECTION');
     }
 
-    if (!query) return list;
-    return list.filter(c => 
-      (c.name || '').toLowerCase().includes(query) || 
-      (c.company || '').toLowerCase().includes(query) || 
-      (c.title || '').toLowerCase().includes(query)
-    );
-  }, [currentTabBaseList, typeFilter, query]);
+    const q = debouncedSearch || query;
+    if (q) {
+      list = list.filter(c => 
+        (c.name || '').toLowerCase().includes(q) || 
+        (c.company || '').toLowerCase().includes(q) || 
+        (c.title || '').toLowerCase().includes(q)
+      );
+    }
+
+    return [...list].sort((a, b) => {
+      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+      if (sortBy === 'company') return (a.company || '').localeCompare(b.company || '');
+      return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
+    });
+  }, [currentTabBaseList, typeFilter, debouncedSearch, query, sortBy]);
+
+  const handleExportCSV = () => {
+    const headers = ['Name', 'Title', 'Company', 'Location', 'Relationship', 'Status'];
+    const rows = filteredContacts.map(c => [
+      `"${(c.name || '').replace(/"/g, '""')}"`,
+      `"${(c.title || '').replace(/"/g, '""')}"`,
+      `"${(c.company || '').replace(/"/g, '""')}"`,
+      `"${((c as any).location || 'San Francisco, CA').replace(/"/g, '""')}"`,
+      `"${c.contact_type === 'BHANU_CONNECTION' ? 'Strong' : c.founder_reviewed ? 'Moderate' : 'Target'}"`,
+      `"${c.founder_reviewed ? 'ACCEPTED' : 'PENDING'}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `networkos_people_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === filteredContacts.length && filteredContacts.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredContacts.map(c => c.id)));
+    }
+  };
+
+  const handleToggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
 
   // Graph data calculations
   const rawGraphNodes = useMemo(() => graphData?.nodes || [], [graphData]);
@@ -349,47 +439,62 @@ export const PeopleWorkspace: React.FC = () => {
       )}
 
       <WorkspaceShell
-        title="People & Relationships"
-        subtitle={
-          query
-            ? `Search results for "${query}"`
-            : viewMode === 'accepted'
-              ? "Your active network. Only contacts you have explicitly accepted appear here."
-              : viewMode === 'pending'
-                ? "Researched candidates awaiting your review and acceptance."
-                : "All researched contacts across your workspace."
-        }
+        title="People"
+        subtitle="All your contacts and professional connections"
+        breadcrumbs={[
+          { label: 'People', path: '/people' }
+        ]}
         isLoading={isLoading}
         isError={isError}
         isEmpty={false}
         headerActions={
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <button
-              onClick={() => navigate('/network')}
+              onClick={() => setViewMode(viewMode === 'graph' ? 'all' : 'graph')}
               style={{
                 padding: '8px 14px',
                 borderRadius: '8px',
-                border: '1px solid var(--color-border)',
-                background: '#fff',
-                color: 'var(--color-text-primary)',
+                border: '1px solid #E2E8F0',
+                background: viewMode === 'graph' ? '#0B132B' : '#fff',
+                color: viewMode === 'graph' ? '#fff' : '#0F172A',
                 fontWeight: 600,
                 fontSize: '13px',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                transition: 'all 0.2s',
+                transition: 'all 0.15s ease',
               }}
             >
-              🌐 Network Intelligence
+              {viewMode === 'graph' ? 'List View' : 'Visual Graph'}
             </button>
             <button
               onClick={() => setShowImport(true)}
               style={{
+                padding: '8px 14px',
+                borderRadius: '8px',
+                border: '1px solid #E2E8F0',
+                background: '#fff',
+                color: '#334155',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Download size={14} />
+              Import Bhanu's CSV
+            </button>
+            <button
+              onClick={() => navigate('/contacts/new')}
+              style={{
                 padding: '8px 16px',
                 borderRadius: '8px',
                 border: 'none',
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                background: '#2563EB',
                 color: '#fff',
                 fontWeight: 600,
                 fontSize: '13px',
@@ -397,173 +502,82 @@ export const PeopleWorkspace: React.FC = () => {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
-                transition: 'all 0.2s',
+                boxShadow: '0 1px 3px rgba(37,99,235,0.25)',
+                transition: 'all 0.15s ease',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              Import Bhanu's CSV
+              <Plus size={15} />
+              + Add People
             </button>
           </div>
         }
       >
-        {/* Network Discovery & Acceptance Guidance Callout Banner */}
-        <div style={{
-          background: 'linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%)',
-          border: '1px solid #E2E8F0',
-          borderRadius: '12px',
-          padding: '14px 18px',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '22px' }}>🛡️</span>
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B' }}>
-                Researched Profiles Require Your Acceptance
-              </div>
-              <div style={{ fontSize: '12px', color: '#64748B' }}>
-                Researched contacts from Bhanu's 820+ network or new targets only enter <strong>People & Relationships</strong> once you accept them.
-                {pendingCount > 0 && (
-                  <span style={{ marginLeft: '6px', color: '#4F46E5', fontWeight: 600 }}>
-                    ({pendingCount} profile{pendingCount > 1 ? 's' : ''} awaiting review)
-                  </span>
-                )}
+        {/* Unreviewed Profiles Notice Banner */}
+        {pendingCount > 0 && viewMode !== 'pending' && (
+          <div style={{
+            background: '#FFFBEB',
+            border: '1px solid #FDE68A',
+            borderRadius: '10px',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '18px' }}>🛡️</span>
+              <div style={{ fontSize: '13px', color: '#92400E' }}>
+                <strong>{pendingCount} candidate profile{pendingCount > 1 ? 's' : ''}</strong> awaiting your review and acceptance into active network.
               </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {pendingCount > 0 && viewMode !== 'pending' && (
-              <button
-                onClick={() => setViewMode('pending')}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  background: '#6366F1',
-                  color: '#fff',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 3px rgba(99, 102, 241, 0.3)'
-                }}
-              >
-                Review Pending ({pendingCount}) →
-              </button>
-            )}
             <button
-              onClick={() => setViewMode(viewMode === 'graph' ? 'accepted' : 'graph')}
+              onClick={() => setViewMode('pending')}
               style={{
-                padding: '6px 14px',
+                padding: '5px 12px',
                 borderRadius: '6px',
-                border: viewMode === 'graph' ? '1px solid #4F46E5' : '1px solid #C7D2FE',
-                background: viewMode === 'graph' ? '#4F46E5' : '#fff',
-                color: viewMode === 'graph' ? '#fff' : '#4F46E5',
+                border: 'none',
+                background: '#D97706',
+                color: '#fff',
                 fontWeight: 600,
                 fontSize: '12px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 1px 2px rgba(79, 70, 229, 0.06)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.15s ease'
+                cursor: 'pointer'
               }}
             >
-              {viewMode === 'graph' ? '📋 Back to People List' : '🕸️ Open Network Graph →'}
+              Review Profiles ({pendingCount}) →
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Primary Acceptance Status Tabs */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--color-border)', paddingBottom: '12px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setViewMode('accepted')}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '8px',
-              border: viewMode === 'accepted' ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '13px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: viewMode === 'accepted' ? 'var(--color-brand-primary)' : '#fff',
-              color: viewMode === 'accepted' ? '#fff' : 'var(--color-text-secondary)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            👥 People & Relationships
-            <span style={{ 
-              fontSize: '11px', 
-              padding: '2px 7px', 
-              borderRadius: '10px', 
-              background: viewMode === 'accepted' ? 'rgba(255,255,255,0.25)' : '#EFF6FF',
-              color: viewMode === 'accepted' ? '#fff' : 'var(--color-brand-primary)',
-              fontWeight: 700
-            }}>
-              {acceptedCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setViewMode('pending')}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '8px',
-              border: viewMode === 'pending' ? '1px solid #D97706' : '1px solid var(--color-border)',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '13px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: viewMode === 'pending' ? '#D97706' : '#fff',
-              color: viewMode === 'pending' ? '#fff' : 'var(--color-text-secondary)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            ⏳ Pending Acceptance
-            <span style={{ 
-              fontSize: '11px', 
-              padding: '2px 7px', 
-              borderRadius: '10px', 
-              background: viewMode === 'pending' ? 'rgba(255,255,255,0.25)' : '#FEF3C7',
-              color: viewMode === 'pending' ? '#fff' : '#B45309',
-              fontWeight: 700
-            }}>
-              {pendingCount}
-            </span>
-          </button>
-
+        {/* Screen 2 Segmented Tabs */}
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '18px',
+          borderBottom: '1px solid #E2E8F0',
+          paddingBottom: '12px',
+          flexWrap: 'wrap',
+          alignItems: 'center'
+        }}>
           <button
             onClick={() => setViewMode('all')}
             style={{
-              padding: '8px 18px',
+              padding: '7px 16px',
               borderRadius: '8px',
-              border: viewMode === 'all' ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
+              border: viewMode === 'all' ? '1px solid #2563EB' : '1px solid #E2E8F0',
               cursor: 'pointer',
               fontWeight: 600,
               fontSize: '13px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              background: viewMode === 'all' ? 'var(--color-brand-primary)' : '#fff',
-              color: viewMode === 'all' ? '#fff' : 'var(--color-text-secondary)',
+              background: viewMode === 'all' ? '#2563EB' : '#fff',
+              color: viewMode === 'all' ? '#fff' : '#475569',
               transition: 'all 0.15s ease'
             }}
           >
-            All Researched
+            All People
             <span style={{ 
               fontSize: '11px', 
               padding: '2px 7px', 
@@ -577,35 +591,98 @@ export const PeopleWorkspace: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setViewMode('graph')}
+            onClick={() => setViewMode('network')}
             style={{
-              padding: '8px 18px',
+              padding: '7px 16px',
               borderRadius: '8px',
-              border: viewMode === 'graph' ? '1px solid #4F46E5' : '1px solid var(--color-border)',
+              border: viewMode === 'network' ? '1px solid #2563EB' : '1px solid #E2E8F0',
               cursor: 'pointer',
               fontWeight: 600,
               fontSize: '13px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              background: viewMode === 'graph' ? '#4F46E5' : '#fff',
-              color: viewMode === 'graph' ? '#fff' : 'var(--color-text-secondary)',
+              background: viewMode === 'network' ? '#2563EB' : '#fff',
+              color: viewMode === 'network' ? '#fff' : '#475569',
               transition: 'all 0.15s ease'
             }}
           >
-            🕸️ Visual Network Graph
+            My Network
             <span style={{ 
               fontSize: '11px', 
               padding: '2px 7px', 
               borderRadius: '10px', 
-              background: viewMode === 'graph' ? 'rgba(255,255,255,0.25)' : '#EEF2FF',
-              color: viewMode === 'graph' ? '#fff' : '#4F46E5',
+              background: viewMode === 'network' ? 'rgba(255,255,255,0.25)' : '#EFF6FF',
+              color: viewMode === 'network' ? '#fff' : '#2563EB',
               fontWeight: 700
             }}>
-              Interactive
+              {networkCount}
             </span>
           </button>
+
+          <button
+            onClick={() => setViewMode('companies')}
+            style={{
+              padding: '7px 16px',
+              borderRadius: '8px',
+              border: viewMode === 'companies' ? '1px solid #2563EB' : '1px solid #E2E8F0',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: viewMode === 'companies' ? '#2563EB' : '#fff',
+              color: viewMode === 'companies' ? '#fff' : '#475569',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Companies
+            <span style={{ 
+              fontSize: '11px', 
+              padding: '2px 7px', 
+              borderRadius: '10px', 
+              background: viewMode === 'companies' ? 'rgba(255,255,255,0.25)' : '#F1F5F9',
+              color: viewMode === 'companies' ? '#fff' : '#64748B',
+              fontWeight: 700
+            }}>
+              {companiesCount}
+            </span>
+          </button>
+
+          {pendingCount > 0 && (
+            <button
+              onClick={() => setViewMode('pending')}
+              style={{
+                padding: '7px 16px',
+                borderRadius: '8px',
+                border: viewMode === 'pending' ? '1px solid #D97706' : '1px solid #FCD34D',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '13px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: viewMode === 'pending' ? '#D97706' : '#FFFBEB',
+                color: viewMode === 'pending' ? '#fff' : '#B45309',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Pending Review
+              <span style={{ 
+                fontSize: '11px', 
+                padding: '2px 7px', 
+                borderRadius: '10px', 
+                background: viewMode === 'pending' ? 'rgba(255,255,255,0.25)' : '#FEF3C7',
+                color: viewMode === 'pending' ? '#fff' : '#B45309',
+                fontWeight: 700
+              }}>
+                {pendingCount}
+              </span>
+            </button>
+          )}
         </div>
+
 
         {viewMode === 'graph' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -927,346 +1004,471 @@ export const PeopleWorkspace: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Secondary Category / Type Filter */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', marginRight: '4px' }}>Filter:</span>
-          <button
-            onClick={() => setTypeFilter('all')}
-            style={{
-              padding: '4px 12px',
-              borderRadius: '6px',
-              border: typeFilter === 'all' ? '1px solid #475569' : '1px solid #E2E8F0',
-              background: typeFilter === 'all' ? '#F1F5F9' : '#fff',
-              color: typeFilter === 'all' ? '#1E293B' : '#64748B',
-              fontSize: '12px',
-              fontWeight: typeFilter === 'all' ? 600 : 500,
-              cursor: 'pointer'
-            }}
-          >
-            All Types
-          </button>
-          <button
-            onClick={() => setTypeFilter('targets')}
-            style={{
-              padding: '4px 12px',
-              borderRadius: '6px',
-              border: typeFilter === 'targets' ? '1px solid #0284C7' : '1px solid #E2E8F0',
-              background: typeFilter === 'targets' ? '#E0F2FE' : '#fff',
-              color: typeFilter === 'targets' ? '#0369A1' : '#64748B',
-              fontSize: '12px',
-              fontWeight: typeFilter === 'targets' ? 600 : 500,
-              cursor: 'pointer'
-            }}
-          >
-            🎯 Targets
-          </button>
-          <button
-            onClick={() => setTypeFilter('network')}
-            style={{
-              padding: '4px 12px',
-              borderRadius: '6px',
-              border: typeFilter === 'network' ? '1px solid #6366F1' : '1px solid #E2E8F0',
-              background: typeFilter === 'network' ? '#EEF2FF' : '#fff',
-              color: typeFilter === 'network' ? '#4F46E5' : '#64748B',
-              fontSize: '12px',
-              fontWeight: typeFilter === 'network' ? 600 : 500,
-              cursor: 'pointer'
-            }}
-          >
-            🤝 Network
-          </button>
-        </div>
-
-        {/* Empty state action helper when viewMode === 'accepted' and acceptedCount === 0 */}
-        {viewMode === 'accepted' && acceptedCount === 0 && pendingCount > 0 && (
-          <div style={{
-            background: '#EFF6FF',
-            border: '1px dashed #BFDBFE',
-            borderRadius: '12px',
-            padding: '32px 24px',
-            textAlign: 'center',
-            marginBottom: '24px'
-          }}>
-            <div style={{ fontSize: '32px', marginBottom: '8px' }}>📋</div>
-            <h3 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: 700, color: '#1E40AF' }}>
-              You have {pendingCount} researched profile{pendingCount > 1 ? 's' : ''} waiting for your acceptance
-            </h3>
-            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#2563EB', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
-              To keep your active People & Relationships clean, candidates are held in the review queue until you accept them.
-            </p>
-            <button
-              onClick={() => setViewMode('pending')}
-              style={{
-                padding: '9px 20px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'var(--color-brand-primary)',
-                color: '#fff',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
-              }}
-            >
-              Review Pending Profiles ({pendingCount}) →
-            </button>
-          </div>
-        )}
-
-        {/* Contacts Grid or Empty State */}
-        {filteredContacts.length === 0 ? (
-          <div style={{
-            padding: '48px 24px',
-            textAlign: 'center',
-            border: '1px dashed var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            background: '#fff',
-            marginTop: '8px'
-          }}>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '15px', margin: 0, fontWeight: 500 }}>
-              {query 
-                ? `No results found matching "${query}".` 
-                : viewMode === 'accepted'
-                  ? pendingCount > 0
-                    ? `No accepted contacts matching this filter. You have ${pendingCount} researched profile${pendingCount > 1 ? 's' : ''} in Pending Acceptance.`
-                    : "No accepted people matching this filter."
-                  : viewMode === 'pending'
-                    ? "No profiles currently pending acceptance. All researched contacts have been accepted!"
-                    : "No researched people in your workspace."}
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 'var(--space-6)' }}>
-          {filteredContacts.map(contact => {
-            const isBhanuConnection = contact.contact_type === 'BHANU_CONNECTION';
-            const isAccepted = Boolean(contact.founder_reviewed);
-            const isAccepting = acceptingId === contact.id;
-            const isDeclining = decliningId === contact.id;
-
-            return (
-              <div 
-                key={contact.id} 
-                onClick={() => navigate(`/people/${contact.id}`)}
-                style={{ 
-                  padding: 'var(--space-6)', 
-                  background: '#fff', 
-                  borderRadius: 'var(--radius-lg)', 
-                  border: isBhanuConnection ? '1px solid #E0E7FF' : '1px solid var(--color-border)', 
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 'var(--space-4)',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                  position: 'relative'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    background: isBhanuConnection
-                      ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-                      : 'var(--color-brand-primary)',
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 600,
-                    fontSize: '14px',
-                    flexShrink: 0
-                  }}>
-                    {(contact.name || 'C').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                  </div>
-                  <div style={{ overflow: 'hidden', flex: 1 }}>
-                    <h3 className="card-title" style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 600 }}>{contact.name || 'Contact'}</h3>
-                    <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                      {contact.title && contact.company 
-                        ? `${contact.title} · ${contact.company}` 
-                        : contact.title || contact.company || 'Professional'}
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Badges Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* Acceptance Badge */}
-                    {isAccepted ? (
-                      <span style={{
-                        fontSize: '11px',
-                        padding: '3px 8px',
-                        background: '#EFF6FF',
-                        color: 'var(--color-brand-primary)',
-                        border: '1px solid #BFDBFE',
-                        borderRadius: 'var(--radius-sm)',
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}>
-                        ✓ Accepted
-                      </span>
-                    ) : (
-                      <span style={{
-                        fontSize: '11px',
-                        padding: '3px 8px',
-                        background: '#FEF3C7',
-                        color: '#B45309',
-                        borderRadius: 'var(--radius-sm)',
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}>
-                        ⏳ Pending Acceptance
-                      </span>
-                    )}
-
-                    <span className="labels" style={{ 
-                      fontSize: 'var(--font-size-xs)', 
-                      padding: '3px 8px', 
-                      background: contact.status === 'READY' || contact.status === 'INTELLIGENCE_READY' ? '#ECFDF5' : '#F1F5F9', 
-                      color: contact.status === 'READY' || contact.status === 'INTELLIGENCE_READY' ? '#047857' : '#475569',
-                      borderRadius: 'var(--radius-sm)',
-                      fontWeight: 600
-                    }}>
-                      {contact.status === 'PROCESSING' ? 'RESEARCHING' : contact.status.replace('_', ' ')}
-                    </span>
-
-                    {isBhanuConnection ? (
-                      <span style={{ 
-                        fontSize: '11px', 
-                        padding: '3px 7px', 
-                        background: '#EEF2FF', 
-                        color: '#4F46E5', 
-                        borderRadius: 'var(--radius-sm)',
-                        fontWeight: 600
-                      }}>
-                        🤝 Network
-                      </span>
-                    ) : (
-                      <span style={{ 
-                        fontSize: '11px', 
-                        padding: '3px 7px', 
-                        background: '#F0F9FF', 
-                        color: '#0369A1', 
-                        borderRadius: 'var(--radius-sm)',
-                        fontWeight: 600
-                      }}>
-                        🎯 Target
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Actions Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 'var(--space-2)', borderTop: '1px solid #F1F5F9' }}>
-                  {!isAccepted ? (
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => acceptMutation.mutate(contact.id)}
-                        disabled={isAccepting}
-                        style={{
-                          padding: '5px 12px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: 'var(--color-brand-primary)',
-                          color: '#fff',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: isAccepting ? 'not-allowed' : 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          boxShadow: '0 1px 3px rgba(37, 99, 235, 0.25)',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        {isAccepting ? 'Accepting…' : '✓ Accept'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => declineMutation.mutate(contact.id)}
-                        disabled={isDeclining}
-                        style={{
-                          padding: '5px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid #CBD5E1',
-                          background: '#fff',
-                          color: '#64748B',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          cursor: isDeclining ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        {isDeclining ? 'Declining…' : '✕ Decline'}
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '12px', color: 'var(--color-brand-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      <span>✓ In People Network</span>
-                    </div>
-                  )}
-
+            {/* Screen 2 Filter & Action Toolbar */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '16px',
+              flexWrap: 'wrap'
+            }}>
+              {/* Search bar */}
+              <div style={{
+                position: 'relative',
+                flex: '1',
+                minWidth: '280px',
+                maxWidth: '480px'
+              }}>
+                <Search size={16} color="#64748B" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  placeholder="Search people by name, company, title..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px 9px 36px',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0',
+                    fontSize: '13px',
+                    outline: 'none',
+                    background: '#fff',
+                    color: '#0F172A',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                {searchQuery && (
                   <button
-                    type="button"
-                    title="Delete connection"
-                    onClick={(e) => handleDelete(e, contact.id, contact.name)}
-                    disabled={deletingId === contact.id}
+                    onClick={() => setSearchQuery('')}
                     style={{
-                      background: 'transparent',
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
                       border: 'none',
                       color: '#94A3B8',
-                      cursor: deletingId === contact.id ? 'not-allowed' : 'pointer',
-                      padding: '4px 8px',
-                      borderRadius: 'var(--radius-sm)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '12px',
-                      fontWeight: 500,
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (deletingId !== contact.id) {
-                        e.currentTarget.style.color = '#DC2626';
-                        e.currentTarget.style.backgroundColor = '#FEF2F2';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (deletingId !== contact.id) {
-                        e.currentTarget.style.color = '#94A3B8';
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }
+                      cursor: 'pointer',
+                      fontSize: '14px'
                     }}
                   >
-                    {deletingId === contact.id ? (
-                      <span style={{ color: '#DC2626', fontSize: '11px' }}>Deleting...</span>
-                    ) : (
-                      <>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="3 6 5 6 21 6"></polyline>
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                          <line x1="10" y1="11" x2="10" y2="17"></line>
-                          <line x1="14" y1="11" x2="14" y2="17"></line>
-                        </svg>
-                        <span>Delete</span>
-                      </>
-                    )}
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Action controls: Quick Filter, Sort, Export, View Toggle */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '4px', background: '#F1F5F9', padding: '3px', borderRadius: '8px' }}>
+                  {(['all', 'targets', 'network'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTypeFilter(t)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        background: typeFilter === t ? '#fff' : 'transparent',
+                        color: typeFilter === t ? '#0F172A' : '#64748B',
+                        boxShadow: typeFilter === t ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      {t === 'all' ? 'All' : t === 'targets' ? 'Targets' : 'Network'}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setSortBy(sortBy === 'name' ? 'company' : sortBy === 'company' ? 'activity' : 'name')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0',
+                    background: '#fff',
+                    color: '#334155',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <ArrowUpDown size={14} />
+                  Sort: {sortBy === 'name' ? 'Name' : sortBy === 'company' ? 'Company' : 'Activity'}
+                </button>
+
+                <button
+                  onClick={handleExportCSV}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0',
+                    background: '#fff',
+                    color: '#334155',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Download size={14} />
+                  Export
+                </button>
+
+                <div style={{ display: 'flex', border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
+                  <button
+                    onClick={() => setDisplayFormat('table')}
+                    style={{
+                      padding: '7px 10px',
+                      border: 'none',
+                      background: displayFormat === 'table' ? '#F1F5F9' : '#fff',
+                      color: displayFormat === 'table' ? '#0F172A' : '#64748B',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Table View"
+                  >
+                    <List size={15} />
+                  </button>
+                  <button
+                    onClick={() => setDisplayFormat('grid')}
+                    style={{
+                      padding: '7px 10px',
+                      border: 'none',
+                      borderLeft: '1px solid #E2E8F0',
+                      background: displayFormat === 'grid' ? '#F1F5F9' : '#fff',
+                      color: displayFormat === 'grid' ? '#0F172A' : '#64748B',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Grid View"
+                  >
+                    <Grid size={15} />
                   </button>
                 </div>
               </div>
-            );
-          })}
-          </div>
-        )}
+            </div>
+
+            {/* Empty state */}
+            {filteredContacts.length === 0 ? (
+              <div style={{
+                padding: '48px 24px',
+                textAlign: 'center',
+                border: '1px dashed #CBD5E1',
+                borderRadius: '12px',
+                background: '#fff',
+                marginTop: '8px'
+              }}>
+                <p style={{ color: '#64748B', fontSize: '15px', margin: 0, fontWeight: 500 }}>
+                  {debouncedSearch || query 
+                    ? `No contacts found matching "${debouncedSearch || query}".` 
+                    : viewMode === 'network'
+                      ? "No network contacts matching this filter."
+                      : viewMode === 'companies'
+                        ? "No companies matching this filter."
+                        : viewMode === 'pending'
+                          ? "No profiles currently pending review. All analyzed contacts have been accepted!"
+                          : "No contacts in your workspace."}
+                </p>
+              </div>
+            ) : displayFormat === 'table' ? (
+              /* Screen 2 Enterprise Data Table */
+              <div style={{
+                background: '#fff',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                overflow: 'hidden',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                      <th style={{ width: '40px', padding: '12px 16px' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.size === filteredContacts.length && filteredContacts.length > 0}
+                          onChange={handleToggleSelectAll}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '12px', letterSpacing: '0.04em' }}>NAME</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '12px', letterSpacing: '0.04em' }}>TITLE / COMPANY</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '12px', letterSpacing: '0.04em' }}>LOCATION</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '12px', letterSpacing: '0.04em' }}>RELATIONSHIP</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '12px', letterSpacing: '0.04em' }}>LAST ACTIVITY</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '12px', letterSpacing: '0.04em', textAlign: 'right' }}>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredContacts.map((contact) => {
+                      const isSelected = selectedIds.has(contact.id);
+                      const isBhanu = contact.contact_type === 'BHANU_CONNECTION';
+                      const isAccepted = Boolean(contact.founder_reviewed);
+                      const relationshipType = isBhanu || isAccepted ? 'Strong' : (contact.contact_type === 'TARGET' ? 'Moderate' : 'Weak');
+                      const relBg = relationshipType === 'Strong' ? '#DCFCE7' : relationshipType === 'Moderate' ? '#FEF3C7' : '#F1F5F9';
+                      const relColor = relationshipType === 'Strong' ? '#15803D' : relationshipType === 'Moderate' ? '#B45309' : '#475569';
+                      const initials = (contact.name || 'C').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+                      return (
+                        <tr
+                          key={contact.id}
+                          onClick={() => navigate(`/people/${contact.id}`)}
+                          style={{
+                            borderBottom: '1px solid #F1F5F9',
+                            cursor: 'pointer',
+                            background: isSelected ? '#EFF6FF' : 'transparent',
+                            transition: 'background 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#F8FAFC'; }}
+                          onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          <td style={{ padding: '12px 16px' }} onClick={(e) => handleToggleSelect(contact.id, e)}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}}
+                              style={{ cursor: 'pointer' }}
+                            />
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: isBhanu ? 'linear-gradient(135deg, #2563EB, #4F46E5)' : '#EFF6FF',
+                                color: isBhanu ? '#fff' : '#1D4ED8',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 700,
+                                fontSize: '13px',
+                                flexShrink: 0
+                              }}>
+                                {initials}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 600, color: '#0F172A', fontSize: '13px' }}>
+                                  {contact.name || 'Unnamed Contact'}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#64748B' }}>
+                                  {isAccepted ? 'In Network' : isBhanu ? 'Bhanu Network' : 'Target Prospect'}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ fontWeight: 500, color: '#1E293B' }}>{contact.title || 'Executive'}</div>
+                            <div style={{ fontSize: '12px', color: '#64748B' }}>{contact.company || 'Enterprise'}</div>
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#475569' }}>
+                            {(contact as any).location || 'San Francisco, CA'}
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span style={{
+                              padding: '3px 9px',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              background: relBg,
+                              color: relColor
+                            }}>
+                              {relationshipType}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#64748B', fontSize: '12px' }}>
+                            {contact.lastUpdated || 'Recent'}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                            <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                              {!isAccepted && (
+                                <>
+                                  <button
+                                    onClick={() => acceptMutation.mutate(contact.id)}
+                                    disabled={acceptingId === contact.id}
+                                    style={{
+                                      padding: '5px 10px',
+                                      borderRadius: '6px',
+                                      border: 'none',
+                                      background: '#2563EB',
+                                      color: '#fff',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {acceptingId === contact.id ? '...' : 'Accept'}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setDecliningId(contact.id);
+                                      declineMutation.mutate(contact.id);
+                                    }}
+                                    disabled={decliningId === contact.id}
+                                    style={{
+                                      padding: '5px 8px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #E2E8F0',
+                                      background: '#fff',
+                                      color: '#64748B',
+                                      fontSize: '12px',
+                                      fontWeight: 500,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {decliningId === contact.id ? '...' : 'Decline'}
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={() => navigate(`/people/${contact.id}`)}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #E2E8F0',
+                                  background: '#fff',
+                                  color: '#0F172A',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                View 360
+                              </button>
+                              <button
+                                onClick={(e) => handleDelete(e, contact.id, contact.name)}
+                                disabled={deletingId === contact.id}
+                                style={{
+                                  padding: '5px 8px',
+                                  borderRadius: '6px',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: '#94A3B8',
+                                  cursor: deletingId === contact.id ? 'not-allowed' : 'pointer'
+                                }}
+                                title="Delete contact"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* Grid view option */
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                {filteredContacts.map(contact => {
+                  const isBhanu = contact.contact_type === 'BHANU_CONNECTION';
+                  const isAccepted = Boolean(contact.founder_reviewed);
+                  const initials = (contact.name || 'C').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+                  const relationshipType = isBhanu || isAccepted ? 'Strong' : (contact.contact_type === 'TARGET' ? 'Moderate' : 'Weak');
+                  const relBg = relationshipType === 'Strong' ? '#DCFCE7' : relationshipType === 'Moderate' ? '#FEF3C7' : '#F1F5F9';
+                  const relColor = relationshipType === 'Strong' ? '#15803D' : relationshipType === 'Moderate' ? '#B45309' : '#475569';
+
+                  return (
+                    <div
+                      key={contact.id}
+                      onClick={() => navigate(`/people/${contact.id}`)}
+                      style={{
+                        padding: '18px',
+                        background: '#fff',
+                        borderRadius: '12px',
+                        border: '1px solid #E2E8F0',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#94A3B8'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: isBhanu ? 'linear-gradient(135deg, #2563EB, #4F46E5)' : '#EFF6FF',
+                          color: isBhanu ? '#fff' : '#1D4ED8',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                          flexShrink: 0
+                        }}>
+                          {initials}
+                        </div>
+                        <div style={{ overflow: 'hidden', flex: 1 }}>
+                          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>{contact.name}</h3>
+                          <p style={{ margin: 0, fontSize: '12px', color: '#64748B', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {contact.title && contact.company ? `${contact.title} · ${contact.company}` : contact.title || contact.company || 'Professional'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, background: relBg, color: relColor }}>
+                          {relationshipType}
+                        </span>
+                        <span style={{ fontSize: '12px', color: '#64748B' }}>
+                          {(contact as any).location || 'San Francisco, CA'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #F1F5F9' }}>
+                        <span style={{ fontSize: '12px', color: '#94A3B8' }}>{contact.lastUpdated || 'Recent'}</span>
+                        <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                          {!isAccepted && (
+                            <>
+                              <button
+                                onClick={() => acceptMutation.mutate(contact.id)}
+                                style={{ padding: '4px 8px', borderRadius: '6px', border: 'none', background: '#2563EB', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                              >
+                                Accept
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setDecliningId(contact.id);
+                                  declineMutation.mutate(contact.id);
+                                }}
+                                style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #E2E8F0', background: '#fff', color: '#64748B', fontSize: '11px', cursor: 'pointer' }}
+                              >
+                                Decline
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => navigate(`/people/${contact.id}`)}
+                            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #E2E8F0', background: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            360 →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </>
         )}
       </WorkspaceShell>
     </>
   );
 };
+

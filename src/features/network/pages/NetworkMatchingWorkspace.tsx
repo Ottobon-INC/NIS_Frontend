@@ -1,234 +1,303 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  ArrowLeft, 
+  Building2, 
+  Send
+} from 'lucide-react';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useOpportunity } from '../../../hooks/useOpportunities';
 import { useNetworkMatches, useUpdateNetworkMatchStatus } from '../../../hooks/useNetworkMatching';
-import { TrustBadge } from '../../../components/intelligence/TrustBadge';
-import { useUIStore } from '../../../store/uiStore';
-import type { MatchDimensionLevel, NetworkMatchStatus, NetworkMatch } from '../../../services/api/networkMatching.api';
-
-const DimensionIndicator: React.FC<{ label: string; value: MatchDimensionLevel | string }> = ({ label, value }) => {
-  const getColor = () => {
-    switch (value) {
-      case 'STRONG':
-      case 'AVAILABLE': return 'var(--color-success)';
-      case 'MODERATE':
-      case 'LIMITED': return '#f59e0b';
-      case 'WEAK': return '#ef4444';
-      case 'UNKNOWN': return 'var(--color-text-secondary)';
-      default: return 'var(--color-text-secondary)';
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span className="labels text-secondary">{label}</span>
-      <span className="metadata" style={{ color: getColor() }}>{value}</span>
-    </div>
-  );
-};
+import type { NetworkMatch } from '../../../services/api/networkMatching.api';
 
 export const NetworkMatchingWorkspace: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { openEvidenceDrawer } = useUIStore();
   
   const { data: opp, isLoading: isOppLoading } = useOpportunity(id || '');
   const { data: networkData, isLoading: isMatchesLoading, isError } = useNetworkMatches(id || '');
   const updateMatchMutation = useUpdateNetworkMatchStatus(id || '');
 
+  const [activeTab, setActiveTab] = useState<'ALL' | 'STRONG' | 'MODERATE' | 'POTENTIAL'>('ALL');
+
   if (!id) return <div>Invalid Opportunity ID</div>;
 
-  const handleStatusChange = (matchId: string, status: NetworkMatchStatus) => {
-    updateMatchMutation.mutate({ matchId, status });
+  const allMatches: NetworkMatch[] = networkData?.matches || [];
+
+  const strongMatches = useMemo(() => 
+    allMatches.filter(m => m.dimensions.relationshipStrength === 'STRONG' || m.confidence >= 85),
+    [allMatches]
+  );
+  const moderateMatches = useMemo(() => 
+    allMatches.filter(m => m.dimensions.relationshipStrength === 'MODERATE' || (m.confidence >= 70 && m.confidence < 85)),
+    [allMatches]
+  );
+  const potentialMatches = useMemo(() => 
+    allMatches.filter(m => m.dimensions.relationshipStrength !== 'STRONG' && m.dimensions.relationshipStrength !== 'MODERATE' && m.confidence < 70),
+    [allMatches]
+  );
+
+  const displayedMatches = useMemo(() => {
+    if (activeTab === 'STRONG') return strongMatches;
+    if (activeTab === 'MODERATE') return moderateMatches;
+    if (activeTab === 'POTENTIAL') return potentialMatches;
+    return allMatches;
+  }, [activeTab, allMatches, strongMatches, moderateMatches, potentialMatches]);
+
+  const handleRequestIntro = async (match: NetworkMatch) => {
+    try {
+      await updateMatchMutation.mutateAsync({ matchId: match.id, status: 'SELECTED' });
+      navigate(`/opportunities/${id}/introduction`);
+    } catch {
+      navigate(`/opportunities/${id}/introduction`);
+    }
   };
 
-  const hasSelected = networkData?.matches.some(m => m.status === 'SELECTED');
-
-  const renderCandidateCard = (match: NetworkMatch) => (
-    <div key={match.id} style={{ background: match.status === 'SELECTED' ? '#f0fdf4' : '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: `1px solid ${match.status === 'SELECTED' ? '#bbf7d0' : 'var(--color-border)'}`, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-7)' }}>
-      
-      {/* Left Column: Candidate Details & Reasoning */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
-            <h3 className="card-title" style={{ margin: 0 }}>{match.candidateName}</h3>
-            <span className="labels" style={{ color: 'var(--color-brand-primary)', background: 'var(--color-bg-primary)', padding: '2px 8px', borderRadius: 'var(--radius-sm)' }}>
-              {match.matchType}
-            </span>
-          </div>
-          <p className="body-text text-secondary" style={{ margin: 0 }}>{match.candidateTitle} · {match.candidateCompany}</p>
-        </div>
-
-        <div style={{ background: '#F8FAFC', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-          <h4 className="labels text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>Why This Match?</h4>
-          <p className="body-text" style={{ margin: 0 }}>{match.reasoning}</p>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <TrustBadge level="INFERENCE" />
-            <span className="metadata text-secondary">Confidence: {match.confidence}%</span>
-          </div>
-          <button 
-            className="button-text"
-            onClick={() => openEvidenceDrawer(match.evidenceIds[0], 'INFERENCE', match.candidateName)}
-            style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
-          >
-            View Supporting Evidence
-          </button>
-        </div>
-      </div>
-
-      {/* Right Column: Dimensions & Actions */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', borderLeft: '1px solid var(--color-border)', paddingLeft: 'var(--space-7)' }}>
-        <div>
-          <h4 className="labels text-secondary" style={{ margin: '0 0 var(--space-4) 0' }}>Match Dimensions</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-            <DimensionIndicator label="Relevance" value={match.dimensions.relevance} />
-            <DimensionIndicator label="Expertise" value={match.dimensions.expertise} />
-            <DimensionIndicator label="Relationship" value={match.dimensions.relationshipStrength} />
-            <DimensionIndicator label="Industry Fit" value={match.dimensions.industryFit} />
-            <DimensionIndicator label="Geography" value={match.dimensions.geography} />
-            <DimensionIndicator label="Availability" value={match.dimensions.availability} />
-          </div>
-        </div>
-
-        <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-6)', marginTop: 'auto' }}>
-          {match.status === 'SELECTED' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div>
-                <p className="body-text-important" style={{ margin: '0 0 var(--space-1) 0', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <span>✓</span> NETWORK MATCH SELECTED
-                </p>
-                <p className="body-text text-secondary" style={{ margin: 0 }}>
-                  The founder has selected this person/network candidate for the validated opportunity.
-                </p>
-              </div>
-              <div style={{ background: '#F8FAFC', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                <span className="labels text-secondary" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>Next Stage</span>
-                <p className="body-text-important" style={{ margin: '0 0 var(--space-2) 0' }}>Founder Introduction</p>
-                <button 
-                  className="button-text"
-                  onClick={() => navigate(`/opportunities/${id}/introduction`)}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
-                >
-                  Enter Introduction Workspace &rarr;
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <h4 className="labels text-secondary" style={{ margin: '0 0 var(--space-4) 0' }}>Founder Attention</h4>
-              <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-                <button 
-                  className="button-text"
-                  onClick={() => handleStatusChange(match.id, 'SELECTED')}
-                  disabled={updateMatchMutation.isPending}
-                  style={{ flex: 1, padding: 'var(--space-3)', background: '#fff', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                >
-                  Select Match
-                </button>
-                <button 
-                  className="button-text"
-                  onClick={() => handleStatusChange(match.id, 'REJECTED')}
-                  disabled={updateMatchMutation.isPending || match.status === 'REJECTED'}
-                  style={{ flex: 1, padding: 'var(--space-3)', background: match.status === 'REJECTED' ? '#fee2e2' : '#fff', color: match.status === 'REJECTED' ? '#b91c1c' : 'var(--color-text-primary)', border: `1px solid ${match.status === 'REJECTED' ? '#fca5a5' : 'var(--color-border)'}`, borderRadius: 'var(--radius-sm)', cursor: match.status === 'REJECTED' ? 'default' : 'pointer' }}
-                >
-                  {match.status === 'REJECTED' ? 'Rejected' : 'Reject'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const hasSelected = allMatches.some(m => m.status === 'SELECTED');
 
   return (
     <WorkspaceShell
-      title="Network Matching Intelligence"
-      subtitle="Identify who in our internal organization or broader network can help deliver the selected capability."
+      title="Network Matching"
+      subtitle={opp ? `Business connections from your network for ${opp.companyName}` : 'Business connections from your network'}
       breadcrumbs={[
         { label: 'Opportunities', path: '/opportunities' },
         { label: opp?.title || 'Detail', path: `/opportunities/${id}` },
-        { label: 'Capability Matching', path: `/opportunities/${id}/matching` },
         { label: 'Network Matching', path: `/opportunities/${id}/network-matching` }
       ]}
       isLoading={isOppLoading || isMatchesLoading}
       isError={isError}
-      isEmpty={!isOppLoading && !isMatchesLoading && (!networkData?.matches || networkData.matches.length === 0)}
-      emptyStateMessage="No sufficiently supported network match found."
+      isEmpty={!isOppLoading && !isMatchesLoading && allMatches.length === 0}
+      emptyStateMessage="No sufficiently supported network match found for this opportunity."
       primaryAction={
         hasSelected ? {
-          label: 'Proceed to Founder Introduction',
+          label: 'Proceed to Introduction Workspace →',
           onClick: () => navigate(`/opportunities/${id}/introduction`),
           disabled: false
         } : undefined
       }
     >
       {opp && networkData && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Top Context Blocks */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-7)' }}>
-            <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-4)' }}>
-                <h3 className="labels text-secondary" style={{ margin: 0 }}>Opportunity Context</h3>
-                <button 
-                  className="button-text"
-                  onClick={() => navigate(`/people/${opp.personId}`)}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', padding: 0 }}
-                >
-                  View Person &rarr;
-                </button>
-              </div>
-              <p className="body-text-important" style={{ margin: '0 0 var(--space-2) 0' }}>{opp.title}</p>
-              <p className="body-text text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>{opp.personName} · {opp.companyName}</p>
-              <p className="body-text text-secondary" style={{ margin: 0, fontStyle: 'italic' }}>"{opp.requirement}"</p>
-            </section>
-            
-            <section style={{ background: '#fff', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-              <h3 className="labels text-secondary" style={{ margin: '0 0 var(--space-4) 0' }}>Selected Capability</h3>
-              <p className="body-text-important" style={{ margin: '0 0 var(--space-2) 0' }}>{networkData.selectedCapability?.name}</p>
-              <p className="body-text text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>{networkData.selectedCapability?.category}</p>
-              <p className="body-text" style={{ margin: 0 }}>{networkData.selectedCapability?.description}</p>
-            </section>
+          {/* Header Action Back Button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button
+              onClick={() => navigate(`/opportunities/${id}/matching`)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'none',
+                border: 'none',
+                color: '#64748B',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '4px 0'
+              }}
+            >
+              <ArrowLeft size={16} />
+              <span>Back to Capability Matching</span>
+            </button>
+
+            <span style={{ fontSize: '13px', color: '#64748B' }}>
+              Selected Capability: <strong>{networkData.selectedCapability?.name || 'All Solutions'}</strong>
+            </span>
           </div>
 
-          {/* Network Matches Sections */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-9)' }}>
-            
-            {/* INTERNAL MATCHES */}
-            {networkData.matches.some(m => m.matchType === 'INTERNAL') && (
-              <div>
-                <h2 className="section-title" style={{ margin: '0 0 var(--space-4) 0', borderBottom: '2px solid var(--color-border)', paddingBottom: 'var(--space-2)' }}>INTERNAL MATCHES</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-                  {networkData.matches.filter(m => m.matchType === 'INTERNAL').map(renderCandidateCard)}
-                </div>
-              </div>
-            )}
+          {/* Segmented Tabs (Screen 7 specification) */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            borderBottom: '1px solid #E2E8F0',
+            paddingBottom: '0'
+          }}>
+            {[
+              { key: 'ALL', label: 'All Matches', count: allMatches.length },
+              { key: 'STRONG', label: 'Strong', count: strongMatches.length },
+              { key: 'MODERATE', label: 'Moderate', count: moderateMatches.length },
+              { key: 'POTENTIAL', label: 'Potential', count: potentialMatches.length },
+            ].map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key as any)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 18px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? '#2563EB' : '#64748B',
+                    borderBottom: isActive ? '2px solid #2563EB' : '2px solid transparent',
+                    marginBottom: '-1px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>{tab.label}</span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '2px 7px',
+                    borderRadius: '10px',
+                    background: isActive ? '#EFF6FF' : '#F1F5F9',
+                    color: isActive ? '#1D4ED8' : '#64748B'
+                  }}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-            {/* NETWORK MATCHES */}
-            {networkData.matches.some(m => m.matchType === 'NETWORK') && (
-              <div>
-                <h2 className="section-title" style={{ margin: '0 0 var(--space-4) 0', borderBottom: '2px solid var(--color-border)', paddingBottom: 'var(--space-2)' }}>NETWORK MATCHES</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-                  {networkData.matches.filter(m => m.matchType === 'NETWORK').map(renderCandidateCard)}
-                </div>
-              </div>
-            )}
+          {/* Screen 7 Match Table */}
+          <div style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <th style={{ padding: '14px 20px' }}>Contact Name</th>
+                    <th style={{ padding: '14px 20px' }}>Title &amp; Company</th>
+                    <th style={{ padding: '14px 20px' }}>Reasoning &amp; Mutual Value</th>
+                    <th style={{ padding: '14px 20px' }}>Strength</th>
+                    <th style={{ padding: '14px 20px' }}>Confidence</th>
+                    <th style={{ padding: '14px 20px', textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedMatches.map((match) => {
+                    const isSelected = match.status === 'SELECTED';
+                    const isStrong = match.dimensions.relationshipStrength === 'STRONG' || match.confidence >= 85;
+                    const isModerate = match.dimensions.relationshipStrength === 'MODERATE' || (match.confidence >= 70 && match.confidence < 85);
+                    
+                    const initials = match.candidateName
+                      ? match.candidateName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                      : 'OT';
 
-            {/* HYBRID MATCHES */}
-            {networkData.matches.some(m => m.matchType === 'HYBRID') && (
-              <div>
-                <h2 className="section-title" style={{ margin: '0 0 var(--space-4) 0', borderBottom: '2px solid var(--color-border)', paddingBottom: 'var(--space-2)' }}>HYBRID MATCHES</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-                  {networkData.matches.filter(m => m.matchType === 'HYBRID').map(renderCandidateCard)}
-                </div>
-              </div>
-            )}
-            
+                    return (
+                      <tr
+                        key={match.id}
+                        style={{
+                          borderBottom: '1px solid #F1F5F9',
+                          background: isSelected ? '#F0FDF4' : '#FFFFFF',
+                          transition: 'background 0.15s ease'
+                        }}
+                      >
+                        {/* Contact Name & Avatar */}
+                        <td style={{ padding: '16px 20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: '#EEF2FF',
+                              color: '#2563EB',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {initials}
+                            </div>
+                            <div>
+                              <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '14px', display: 'block' }}>
+                                {match.candidateName}
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#64748B' }}>
+                                {match.matchType} Match
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Title & Company */}
+                        <td style={{ padding: '16px 20px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ color: '#1E293B', fontWeight: 500 }}>
+                              {match.candidateTitle}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#64748B', fontSize: '12px' }}>
+                              <Building2 size={12} />
+                              <span>{match.candidateCompany}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Reasoning */}
+                        <td style={{ padding: '16px 20px', maxWidth: '380px' }}>
+                          <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.4', color: '#334155' }}>
+                            {match.reasoning}
+                          </p>
+                        </td>
+
+                        {/* Strength Badge */}
+                        <td style={{ padding: '16px 20px' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '3px 10px',
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            background: isStrong ? '#ECFDF5' : isModerate ? '#FEF3C7' : '#EFF6FF',
+                            color: isStrong ? '#047857' : isModerate ? '#B45309' : '#1D4ED8',
+                            border: `1px solid ${isStrong ? '#A7F3D0' : isModerate ? '#FDE68A' : '#DBEAFE'}`
+                          }}>
+                            {isStrong ? 'Strong' : isModerate ? 'Moderate' : 'Potential'}
+                          </span>
+                        </td>
+
+                        {/* Confidence */}
+                        <td style={{ padding: '16px 20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#1E293B' }}>
+                              {match.confidence}%
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Action */}
+                        <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                          <button
+                            onClick={() => handleRequestIntro(match)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '8px 16px',
+                              borderRadius: '8px',
+                              background: isSelected ? '#ECFDF5' : '#2563EB',
+                              color: isSelected ? '#047857' : '#FFFFFF',
+                              border: isSelected ? '1px solid #A7F3D0' : 'none',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              boxShadow: isSelected ? 'none' : '0 1px 2px rgba(37,99,235,0.2)'
+                            }}
+                          >
+                            <Send size={12} />
+                            <span>{isSelected ? 'Intro Selected' : 'Request Intro'}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

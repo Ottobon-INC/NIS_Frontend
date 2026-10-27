@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import styles from './WorkspaceShell.module.css';
 
 interface WorkspaceShellProps {
   title: string;
@@ -30,37 +31,50 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  // Only display breadcrumbs if there is an actual hierarchy (> 1 item)
+  const hasBreadcrumbs = breadcrumbs && breadcrumbs.length > 1;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className={styles.shell}>
       {/* Workspace Header */}
-      <div style={{ marginBottom: 'var(--space-7)' }}>
-        {breadcrumbs && breadcrumbs.length > 0 ? (
-          <nav style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-4)', fontSize: 'var(--font-size-sm)' }}>
-            {breadcrumbs.map((bc, index) => (
-              <React.Fragment key={bc.path}>
-                {index > 0 ? <span style={{ color: 'var(--color-text-secondary)' }}>/</span> : null}
-                <button 
-                  onClick={() => navigate(bc.path)}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: 0 }}
-                >
-                  {bc.label}
-                </button>
-              </React.Fragment>
-            ))}
+      <div className={styles.header}>
+        {hasBreadcrumbs ? (
+          <nav className={styles.breadcrumbs} aria-label="Breadcrumbs">
+            {breadcrumbs.map((bc, index) => {
+              const isLast = index === breadcrumbs.length - 1;
+              return (
+                <React.Fragment key={bc.path || index}>
+                  {index > 0 ? <span className={styles.breadcrumbSeparator}>/</span> : null}
+                  {isLast ? (
+                    <span className={styles.breadcrumbCurrent}>{bc.label}</span>
+                  ) : (
+                    <button 
+                      type="button"
+                      onClick={() => navigate(bc.path)}
+                      className={styles.breadcrumbLink}
+                    >
+                      {index === 0 && <span aria-hidden="true">←</span>}
+                      {bc.label}
+                    </button>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </nav>
         ) : null}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
+        <div className={styles.titleRow}>
+          <div className={styles.titleContainer}>
             <h1 className="page-title">{title}</h1>
-            {subtitle ? <p className="body-text text-secondary" style={{ marginTop: 'var(--space-2)' }}>{subtitle}</p> : null}
+            {subtitle ? <p className="page-subtitle">{subtitle}</p> : null}
           </div>
           
-          <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'center' }}>
+          <div className={styles.actionsContainer}>
             {headerActions ? headerActions : null}
             {secondaryActions ? secondaryActions.map(action => (
               <button 
                 key={action.label}
+                type="button"
                 onClick={action.onClick}
                 disabled={action.disabled}
                 className={`btn ${action.variant === 'primary' ? 'btn-primary' : action.variant === 'danger' ? 'btn-danger' : 'btn-secondary'}`}
@@ -70,6 +84,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
             )) : null}
             {primaryAction ? (
               <button 
+                type="button"
                 onClick={primaryAction.onClick}
                 disabled={primaryAction.disabled}
                 className="btn btn-primary"
@@ -82,22 +97,22 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
       </div>
 
       {/* Workspace Content */}
-      <div style={{ flex: 1 }}>
+      <div className={styles.contentContainer}>
         {isLoading ? (
-          <div style={{ padding: 'var(--space-9)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            Loading workspace context...
+          <div className={styles.stateContainer}>
+            <p className="body-text text-secondary">Loading workspace context...</p>
           </div>
         ) : null}
         
         {isError ? (
-          <div style={{ padding: 'var(--space-9)', textAlign: 'center', color: 'var(--color-error)', border: '1px solid var(--color-error)', borderRadius: 'var(--radius-md)', background: '#fff' }}>
-            Failed to load workspace context.
+          <div className={styles.stateContainer} style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>
+            <p className="body-text-important">Failed to load workspace context.</p>
           </div>
         ) : null}
 
         {isEmpty && !isLoading && !isError ? (
-          <div style={{ padding: 'var(--space-9) var(--space-8)', textAlign: 'center', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-md)', background: '#fff' }}>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-lg)' }}>{emptyStateMessage || 'No items to display.'}</p>
+          <div className={styles.stateContainer} style={{ borderStyle: 'dashed' }}>
+            <p className="body-text text-secondary">{emptyStateMessage || 'No items to display.'}</p>
           </div>
         ) : null}
 

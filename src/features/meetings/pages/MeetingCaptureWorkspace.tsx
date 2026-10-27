@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useMeetingCapture } from '../../../hooks/useMeeting';
+import { Sparkles, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 export const MeetingCaptureWorkspace: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,52 +12,147 @@ export const MeetingCaptureWorkspace: React.FC = () => {
   const handleCapture = () => {
     captureMutation.mutate({ transcript }, {
       onSuccess: () => {
-        // Direct to Meeting Intelligence for Founder Validation
         navigate(`/meetings/${id}/intelligence`);
       }
     });
   };
 
   return (
-    <WorkspaceShell
-      title="Meeting Capture"
-      subtitle="Extract candidate intelligence from the meeting."
-      breadcrumbs={[
-        { label: 'Meeting Brief', path: `/meetings/${id}/brief` },
-        { label: 'Capture', path: `/meetings/${id}/capture` }
-      ]}
-    >
-      <div style={{ maxWidth: '800px', background: '#fff', padding: 'var(--space-7)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-        <h2 className="section-title" style={{ margin: '0 0 var(--space-4) 0' }}>Capture Notes or Transcript</h2>
-        <p className="body-text text-secondary" style={{ marginBottom: 'var(--space-6)' }}>
-          NetworkOS will process the input to extract candidate problems, requirements, and people findings.
-        </p>
-        
-        <textarea
-          value={transcript}
-          onChange={(e) => setTranscript(e.target.value)}
-          placeholder="Paste meeting transcript or raw notes here..."
-          style={{ width: '100%', height: '300px', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', fontFamily: 'inherit', marginBottom: 'var(--space-6)' }}
-        />
-        
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-4)' }}>
-          <button 
-            className="button-text"
+    <div style={{ maxWidth: '840px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+      {/* Back button */}
+      <div>
+        <button
+          type="button"
+          onClick={() => navigate(`/meetings/${id}/brief`)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'none',
+            border: 'none',
+            color: 'var(--color-text-secondary)',
+            fontSize: '13px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            padding: 0
+          }}
+        >
+          <ArrowLeft size={14} />
+          <span>Back to Meeting Brief</span>
+        </button>
+      </div>
+
+      {/* Header */}
+      <div>
+        <h1 className="page-title">Capture Meeting Notes &amp; Intelligence</h1>
+        <p className="page-subtitle">Paste raw notes, minutes, or transcript to extract verified problems and opportunities</p>
+      </div>
+
+      {/* Main Form Card */}
+      <div style={{
+        background: '#FFFFFF',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--color-border)',
+        padding: 'var(--space-7)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-5)'
+      }}>
+        {/* Info callout */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '12px 16px',
+          background: '#EFF6FF',
+          border: '1px solid #BFDBFE',
+          borderRadius: '8px',
+          fontSize: '13px',
+          color: '#1D4ED8'
+        }}>
+          <Sparkles size={18} style={{ flexShrink: 0 }} />
+          <span>
+            NetworkOS AI will parse your notes to identify observed business challenges, technical requirements, and people findings.
+          </span>
+        </div>
+
+        {/* Textarea */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B' }}>
+            Meeting Notes or Raw Transcript
+          </label>
+          <textarea
+            value={transcript}
+            onChange={(e) => setTranscript(e.target.value)}
+            placeholder="Paste discussion notes, agenda items, quotes, or verbatim meeting transcript here..."
+            style={{
+              width: '100%',
+              minHeight: '280px',
+              padding: '14px',
+              borderRadius: '8px',
+              border: '1px solid var(--color-border)',
+              fontFamily: 'inherit',
+              fontSize: '14px',
+              lineHeight: '1.6',
+              color: '#0F172A',
+              outline: 'none',
+              resize: 'vertical',
+              boxSizing: 'border-box'
+            }}
+          />
+        </div>
+
+        {/* Feature Badges */}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748B' }}>
+            <CheckCircle2 size={13} color="#059669" />
+            <span>Problem Extraction</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748B' }}>
+            <CheckCircle2 size={13} color="#059669" />
+            <span>Requirements Mapping</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748B' }}>
+            <CheckCircle2 size={13} color="#059669" />
+            <span>Action Item Detection</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          gap: 'var(--space-3)',
+          borderTop: '1px solid var(--color-border)',
+          paddingTop: 'var(--space-5)'
+        }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
             onClick={() => navigate(`/meetings/${id}/brief`)}
-            style={{ padding: 'var(--space-3) var(--space-6)', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
           >
             Cancel
           </button>
-          <button 
-            className="button-text"
-            onClick={handleCapture}
+          <button
+            type="button"
+            className="btn btn-primary"
             disabled={captureMutation.isPending || !transcript.trim()}
-            style={{ padding: 'var(--space-3) var(--space-6)', background: 'var(--color-brand-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', cursor: captureMutation.isPending || !transcript.trim() ? 'not-allowed' : 'pointer' }}
+            onClick={handleCapture}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: captureMutation.isPending || !transcript.trim() ? 0.6 : 1,
+              cursor: captureMutation.isPending || !transcript.trim() ? 'not-allowed' : 'pointer'
+            }}
           >
-            {captureMutation.isPending ? 'Processing Intelligence...' : 'Extract Intelligence'}
+            <Sparkles size={15} />
+            <span>{captureMutation.isPending ? 'Extracting Intelligence...' : 'Extract Intelligence'}</span>
           </button>
         </div>
       </div>
-    </WorkspaceShell>
+    </div>
   );
 };

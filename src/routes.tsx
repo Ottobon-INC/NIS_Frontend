@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
+import { dashboardRoutes } from './features/dashboard/dashboard.routes';
 import { contactRoutes } from './features/contacts/contacts.routes';
 import { opportunityRoutes } from './features/opportunities/opportunities.routes';
 import { meetingRoutes } from './features/meetings/meetings.routes';
@@ -12,13 +13,16 @@ const NotFound = () => <div><h2>404 - Not Found</h2><p>The requested workflow st
 
 /**
  * Root modular routing configuration.
- * Individual feature teams (Contacts, Opportunities, Network) manage their routes inside
+ * Individual feature teams (Dashboard, Contacts, Opportunities, Network) manage their routes inside
  * their respective feature directories (e.g. features/opportunities/opportunities.routes.tsx).
  * Do not add individual page routes directly here!
  */
 export const routes: RouteObject[] = [
-  // Default entrypoint redirect
-  { path: '/', element: <Navigate to="/people" replace /> },
+  // Default entrypoint redirect (Dashboard)
+  { path: '/', element: <Navigate to="/dashboard" replace /> },
+
+  // Stream 0: Dashboard & Founder Cockpit
+  ...dashboardRoutes,
 
   // Stream 1: Contacts & Identity
   ...contactRoutes,

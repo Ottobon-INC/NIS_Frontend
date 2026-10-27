@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Target, Lightbulb, Wrench, Briefcase } from 'lucide-react';
 import { matchingApi } from '../../../services/api/matching.api';
 import type { SemanticProductMatchResponse } from '../../../services/api/matching.api';
 
@@ -359,7 +360,7 @@ export const SemanticProductMatchCard: React.FC<SemanticProductMatchCardProps> =
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <span style={{ fontSize: '18px' }}>🎯</span>
+            <Target size={18} color="#2563EB" />
             <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>
               Observed Problem & Internal Product Fit
             </h3>
@@ -609,7 +610,7 @@ export const SemanticProductMatchCard: React.FC<SemanticProductMatchCardProps> =
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '18px' }}>💡</span>
+                    <Lightbulb size={18} color="#2563EB" />
                     <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1E3A8A' }}>
                       What Can Be The Solution For This Problem:
                     </h4>
@@ -639,8 +640,9 @@ export const SemanticProductMatchCard: React.FC<SemanticProductMatchCardProps> =
                   gap: '10px'
                 }}>
                   <div style={{ background: '#FFFFFF', padding: '12px', borderRadius: '6px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      🛠️ 1. Technical Solution Blueprint
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Wrench size={12} />
+                      <span>1. Technical Solution Blueprint</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
                       {solutionDetails.technicalBlueprint}
@@ -648,8 +650,9 @@ export const SemanticProductMatchCard: React.FC<SemanticProductMatchCardProps> =
                   </div>
 
                   <div style={{ background: '#FFFFFF', padding: '12px', borderRadius: '6px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#4F46E5', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      💼 2. Delivery & Commercial Model
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#4F46E5', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Briefcase size={12} />
+                      <span>2. Delivery & Commercial Model</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
                       {solutionDetails.deliveryModel}
@@ -657,8 +660,9 @@ export const SemanticProductMatchCard: React.FC<SemanticProductMatchCardProps> =
                   </div>
 
                   <div style={{ background: '#FFFFFF', padding: '12px', borderRadius: '6px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      🎯 3. Immediate Action Plan
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Target size={12} />
+                      <span>3. Immediate Action Plan</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
                       {solutionDetails.immediateNextStep}

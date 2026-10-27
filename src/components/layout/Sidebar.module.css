@@ -9,57 +9,110 @@
   left: 0;
   top: 0;
   z-index: 100;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .logoContainer {
   height: var(--topbar-height);
-  padding: var(--space-4) var(--space-6);
+  padding: 0 var(--space-4);
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.logoBadge {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #2563EB, #1D4ED8);
+  display: flex;
+  align-items: center;
   justify-content: center;
 }
 
 .logo {
-  color: #fff;
-  font-size: var(--font-size-xl);
+  color: #FFFFFF;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.subtitle {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-sidebar);
+  letter-spacing: -0.01em;
+  margin: 0;
 }
 
 .nav {
   display: flex;
   flex-direction: column;
-  padding: var(--space-4) 0;
+  padding: var(--space-3) var(--space-2);
+  gap: 2px;
 }
 
 .navItem {
   display: flex;
   align-items: center;
-  padding: var(--space-3) var(--space-6);
+  padding: 8px 12px;
   color: var(--color-text-sidebar);
-  gap: var(--space-4);
-  transition: all 0.2s;
-  font-size: var(--font-size-sm);
+  gap: 12px;
+  transition: all 0.15s ease;
+  font-size: 13px;
   font-weight: 500;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
+.navIcon {
+  color: #64748B;
+  transition: color 0.15s ease;
+  flex-shrink: 0;
 }
 
 .navItem:hover {
   background-color: rgba(255, 255, 255, 0.05);
-  color: var(--color-text-sidebar-hover);
+  color: #FFFFFF;
+}
+
+.navItem:hover .navIcon {
+  color: #CBD5E1;
 }
 
 .active {
-  background-color: var(--color-brand-primary);
-  color: #fff;
-  border-left: 3px solid #fff;
-  padding-left: calc(var(--space-6) - 3px);
+  background-color: rgba(37, 99, 235, 0.18);
+  color: #60A5FA;
+  font-weight: 600;
+}
+
+.active .navIcon {
+  color: #60A5FA;
 }
 
 .active:hover {
-  background-color: var(--color-brand-primary-hover);
+  background-color: rgba(37, 99, 235, 0.25);
+  color: #93C5FD;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 64px;
+    align-items: center;
+  }
+  .logoContainer {
+    padding: 0;
+    justify-content: center;
+    width: 100%;
+  }
+  .logo {
+    display: none;
+  }
+  .nav {
+    padding: var(--space-3) 4px;
+    align-items: center;
+    width: 100%;
+  }
+  .navItem {
+    padding: 10px;
+    justify-content: center;
+    border-radius: var(--radius-md);
+  }
+  .navItem span {
+    display: none;
+  }
 }

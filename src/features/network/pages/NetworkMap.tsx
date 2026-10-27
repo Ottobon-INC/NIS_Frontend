@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Users, Building2, Zap, Network, Search, LayoutGrid, Sparkles } from 'lucide-react';
 import { networkApi } from '../../../services/api/network.api';
 import { NetworkGraphCanvas } from '../components/NetworkGraphCanvas';
 
@@ -86,24 +87,75 @@ export const NetworkMap: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', gap: '16px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 className="page-title" style={{ margin: 0 }}>Ecosystem & Network Intelligence</h1>
-          <p className="body-text text-secondary" style={{ marginTop: '4px' }}>
-            Visualizing Bhanu's imported network bridges, target enterprises, and verified pathways.
+          <h1 className="page-title" style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.02em' }}>Network Map</h1>
+          <p className="body-text text-secondary" style={{ marginTop: '4px', fontSize: '14px', color: '#64748B' }}>
+            Visualize your professional network and connections
           </p>
+
+          {/* Screen 12 View Toggle Strip */}
+          <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+            <button
+              style={{
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#2563EB',
+                color: '#FFFFFF',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'default'
+              }}
+            >
+              Network View
+            </button>
+            <button
+              onClick={() => navigate('/network/events')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: '1px solid #E2E8F0',
+                background: '#FFFFFF',
+                color: '#64748B',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              Ecosystem Events
+            </button>
+            <button
+              onClick={() => navigate('/network/cross-client')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: '1px solid #E2E8F0',
+                background: '#FFFFFF',
+                color: '#64748B',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              Cross-Client Intelligence
+            </button>
+          </div>
         </div>
 
-        {/* Stats Pill Badges */}
+        {/* Clean Stats Pill Badges (Screen 12 specification) */}
         <div style={{ display: 'flex', gap: '10px' }}>
-          <div style={{ padding: '8px 14px', background: '#EEF2FF', borderRadius: '8px', border: '1px solid #C7D2FE', fontSize: '13px', fontWeight: 600, color: '#4338CA' }}>
-            👥 {personCount} People
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#EEF2FF', borderRadius: '8px', border: '1px solid #C7D2FE', fontSize: '13px', fontWeight: 600, color: '#4338CA' }}>
+            <Users size={14} />
+            <span>{personCount} People</span>
           </div>
-          <div style={{ padding: '8px 14px', background: '#F0FDF4', borderRadius: '8px', border: '1px solid #BBF7D0', fontSize: '13px', fontWeight: 600, color: '#15803D' }}>
-            🏢 {companyCount} Companies
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#F0FDF4', borderRadius: '8px', border: '1px solid #BBF7D0', fontSize: '13px', fontWeight: 600, color: '#15803D' }}>
+            <Building2 size={14} />
+            <span>{companyCount} Companies</span>
           </div>
-          <div style={{ padding: '8px 14px', background: '#FEF3C7', borderRadius: '8px', border: '1px solid #FDE68A', fontSize: '13px', fontWeight: 600, color: '#B45309' }}>
-            ⚡ {connectionCount} Connections
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#FEF3C7', borderRadius: '8px', border: '1px solid #FDE68A', fontSize: '13px', fontWeight: 600, color: '#B45309' }}>
+            <Zap size={14} />
+            <span>{connectionCount} Connections</span>
           </div>
         </div>
       </div>
@@ -123,13 +175,16 @@ export const NetworkMap: React.FC = () => {
         }}>
           {/* Controls Bar */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#fff', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
-            <input 
-              type="text"
-              placeholder="Search person or company across all connections..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: 1, minWidth: '180px', border: 'none', outline: 'none', fontSize: '13px' }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '180px' }}>
+              <Search size={14} color="#94A3B8" />
+              <input 
+                type="text"
+                placeholder="Search person or company across all connections..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ width: '100%', border: 'none', outline: 'none', fontSize: '13px' }}
+              />
+            </div>
             <div style={{ display: 'flex', gap: '6px' }}>
               {(['ALL', 'PERSON', 'COMPANY'] as const).map(t => (
                 <button
@@ -154,32 +209,40 @@ export const NetworkMap: React.FC = () => {
               <button
                 onClick={() => setViewStyle('canvas')}
                 style={{
-                  padding: '4px 10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 10px',
                   borderRadius: '6px',
                   border: 'none',
                   fontSize: '11px',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: viewStyle === 'canvas' ? '#4F46E5' : '#F1F5F9',
+                  background: viewStyle === 'canvas' ? '#2563EB' : '#F1F5F9',
                   color: viewStyle === 'canvas' ? '#fff' : '#64748B'
                 }}
               >
-                🕸️ Graph Canvas
+                <Network size={12} />
+                <span>Graph Canvas</span>
               </button>
               <button
                 onClick={() => setViewStyle('grid')}
                 style={{
-                  padding: '4px 10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 10px',
                   borderRadius: '6px',
                   border: 'none',
                   fontSize: '11px',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: viewStyle === 'grid' ? '#4F46E5' : '#F1F5F9',
+                  background: viewStyle === 'grid' ? '#2563EB' : '#F1F5F9',
                   color: viewStyle === 'grid' ? '#fff' : '#64748B'
                 }}
               >
-                📋 Grid
+                <LayoutGrid size={12} />
+                <span>List Grid</span>
               </button>
             </div>
           </div>
@@ -408,7 +471,8 @@ export const NetworkMap: React.FC = () => {
                           <span>Launching Multi-Source Research...</span>
                         ) : (
                           <>
-                            <span>🚀 Initiate Deep Research</span>
+                            <Sparkles size={14} />
+                            <span>Initiate Deep Research</span>
                           </>
                         )}
                       </button>

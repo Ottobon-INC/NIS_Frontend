@@ -309,7 +309,20 @@ export interface EvidenceDetail {
 }
 
 export const contactsApi = {
-  list: () => apiClient.get<ContactOverview[]>('/api/v1/contacts'),
+  list: async (): Promise<ContactOverview[]> => {
+    const list = await apiClient.get<ContactOverview[]>('/api/v1/contacts');
+    if (!Array.isArray(list)) return [];
+    return list.filter(c => {
+      const id = (c.id || '').toLowerCase();
+      if (id.startsWith('test-')) return false;
+      const name = (c.name || '').toLowerCase();
+      const title = (c.title || '').toLowerCase();
+      const company = (c.company || '').toLowerCase();
+      const junk = ['sign in', 'log in', 'login to', 'zoho people', '404 not found', 'access denied', 'cookie policy'];
+      if (junk.some(j => name.includes(j) || title.includes(j) || company.includes(j))) return false;
+      return true;
+    });
+  },
   triggerResearch: (contactId: string) => 
     apiClient.post<{ job_id: string; contact_id: string; status: string }>(`/api/v1/research/jobs/contact/${contactId}`, {}),
   
