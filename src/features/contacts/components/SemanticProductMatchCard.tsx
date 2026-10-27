@@ -154,16 +154,25 @@ const getProposedSolutionDetails = (
   if (backendSolution && backendSolution.trim()) {
     return {
       overview: backendSolution,
-      technicalBlueprint: backendSolution.includes('(1)') 
-        ? backendSolution 
-        : `Implement modern architecture, decoupled services, and targeted engineering sprints to resolve ${problem ? problem.toLowerCase() : 'operational'} bottlenecks.`,
-      deliveryModel: 'Delivered as an Ottobon Bespoke Engineering Sprint (60 hours, $10,000 indicative sprint).',
-      immediateNextStep: 'Conduct architecture & bottleneck audit with the engineering team to map constraints and deliver target blueprint.'
+      technicalBlueprint: backendSolution.includes('(1)')
+        ? backendSolution
+        : `Unified Enterprise Architecture: Multi-agent evaluation harness + CRM integration layer + Deterministic compliance guardrails.`,
+      deliveryModel: 'Delivered as an Ottobon Bespoke Engineering Sprint (60 hours, $12,000 indicative sprint).',
+      immediateNextStep: 'Conduct architecture & evaluation audit with the AI leadership team to map workflow constraints and deliver target blueprint.'
     };
   }
 
   const pLower = (problem || '').toLowerCase();
   const cName = company || 'the enterprise';
+
+  if (pLower.includes('agent') || pLower.includes('agentic') || pLower.includes('front-office') || pLower.includes('front office') || pLower.includes('orchestration')) {
+    return {
+      overview: `Enterprise Agentic AI Reliability & Evaluation Harness for ${cName}: (1) Deterministic Guardrails & Output Validation: Implement Pydantic schema validation, hallucination detection, and policy assertion layers around LLM/agent outputs before downstream CRM execution. (2) Asynchronous Multi-Agent Orchestration & Observability: Deploy event-driven agent coordination with distributed tracing (LangSmith / OpenTelemetry) to track step-by-step reasoning, tool call execution, and state transitions. (3) Continuous Synthetic Evaluation Suite: Build automated benchmark regression tests against historical front-office client scenarios to measure task completion rate and safety. (4) Human-in-the-Loop Escalation Routing: Seamless handoff protocols for low-confidence agent decisions to human specialists.`,
+      technicalBlueprint: 'Agentic Reliability Stack: Deterministic schema guardrails + Multi-agent state orchestration + Distributed LLM tracing/observability + Automated evaluation benchmark harness + HITL escalation gateway.',
+      deliveryModel: 'Delivered via Ottobon Bespoke Engineering: 60-hour Agentic Architecture & Evaluation Sprint ($12,000 indicative sprint).',
+      immediateNextStep: 'Conduct a technical architecture audit of target front-office agent workflows, tool interfaces, and evaluation criteria.'
+    };
+  }
 
   if (pLower.includes('scale') || pLower.includes('scaling') || pLower.includes('system') || pLower.includes('architecture') || pLower.includes('latency') || pLower.includes('monolith')) {
     return {

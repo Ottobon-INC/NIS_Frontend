@@ -23,12 +23,33 @@ export const NetworkMap: React.FC = () => {
   const edges = useMemo(() => data?.edges || [], [data]);
 
   const filteredNodes = useMemo(() => {
+    const seen = new Set<string>();
+    const dummyNames = new Set([
+      'conflict lead', 'contact a', 'contact b', 'placeholder test contact',
+      'empty run candidate', 'date test candidate', 'null test', 'direct lookup user',
+      'valid contact', 'foreign corp executive', 'low confidence candidate',
+      'plan test candidate', 'test unres slug', 'uncertain lead', 'unknown profile',
+      'assumptions lead', 'competitor contact', 'confirmed executive',
+      'confidence test', 'compat test candidate', 'alice candidate'
+    ]);
+
     return nodes.filter(n => {
       const matchesType = filterType === 'ALL' || n.type === filterType;
       const matchesSearch = !searchTerm || 
         n.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (Boolean(n.company) && (n.company as string).toLowerCase().includes(searchTerm.toLowerCase()));
-      return matchesType && matchesSearch;
+      if (!matchesType || !matchesSearch) return false;
+
+      // Filter out test/dummy fixtures by name
+      const normLabel = n.label.trim().toLowerCase();
+      if (dummyNames.has(normLabel)) return false;
+
+      // Deduplicate by type + normalized label + company
+      const key = `${n.type}-${normLabel}-${(n.company || '').trim().toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+
+      return true;
     });
   }, [nodes, filterType, searchTerm]);
 
