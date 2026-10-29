@@ -1,10 +1,11 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, Target, Network, Package } from 'lucide-react';
+import { Users, Target, Network, Package, Zap } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
 const navItems = [
   { path: '/people', label: 'People / Relationships', icon: Users },
+  { path: '/problems', label: 'Problems & Solvers', icon: Zap },
   { path: '/opportunities', label: 'Opportunities', icon: Target },
   { path: '/network', label: 'Network Intelligence', icon: Network },
   { path: '/capabilities', label: 'Products & Capabilities', icon: Package },

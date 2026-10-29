@@ -5,6 +5,7 @@ import { SolutionCapabilityMatchingWorkspace } from './pages/SolutionCapabilityM
 import { PostIntroductionWorkspace } from './pages/PostIntroductionWorkspace';
 import { NetworkMatchingWorkspace } from '../network/pages/NetworkMatchingWorkspace';
 import { FounderIntroductionWorkspace } from '../introductions/pages/FounderIntroductionWorkspace';
+import { ProblemsBoardWorkspace } from './pages/ProblemsBoardWorkspace';
 
 export const opportunityRoutes: RouteObject[] = [
   { path: '/opportunities', element: <OpportunityWorkspace /> },
@@ -13,4 +14,6 @@ export const opportunityRoutes: RouteObject[] = [
   { path: '/opportunities/:id/network-matching', element: <NetworkMatchingWorkspace /> },
   { path: '/opportunities/:id/introduction', element: <FounderIntroductionWorkspace /> },
   { path: '/opportunities/:id/post-introduction', element: <PostIntroductionWorkspace /> },
+  { path: '/problems', element: <ProblemsBoardWorkspace /> },
+  { path: '/problems-board', element: <ProblemsBoardWorkspace /> },
 ];

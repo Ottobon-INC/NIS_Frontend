@@ -17,6 +17,7 @@ import {
   Info,
   Calendar,
   ChevronDown,
+  ChevronUp,
   Download,
   Activity
 } from 'lucide-react';
@@ -28,6 +29,8 @@ import { contactsApi } from '../../../services/api/contacts.api';
 import { CompanyIntelligenceCard } from '../components/CompanyIntelligenceCard';
 import { SemanticProductMatchCard } from '../components/SemanticProductMatchCard';
 import { IdentityAuditModal } from '../components/IdentityAuditModal';
+import { SolverProfileCard } from '../components/SolverProfileCard';
+import { PublicFootprintCard } from '../components/PublicFootprintCard';
 import { matchingApi, type SemanticProductMatchResponse } from '../../../services/api/matching.api';
 
 type TabKey = 'overview' | 'commercial' | 'evidence';
@@ -774,6 +777,21 @@ export const Contact360Workspace: React.FC = () => {
                   queryClient.invalidateQueries({ queryKey: ['contact', id] });
                   queryClient.invalidateQueries({ queryKey: ['contacts'] });
                 }}
+              />
+
+              {/* Solver Capabilities & Superpowers Card */}
+              <SolverProfileCard
+                domainKnowledge={contact.personIntelligence?.domainKnowledge || contact.commercialIntelligence?.domainKnowledge}
+                whatTheyCanSolve={contact.personIntelligence?.whatTheyCanSolve || contact.commercialIntelligence?.whatTheyCanSolve || []}
+                coreStrengths={contact.personIntelligence?.coreStrengths || contact.commercialIntelligence?.coreStrengths || []}
+              />
+
+              {/* Public Footprint & Career Track Record Card */}
+              <PublicFootprintCard
+                careerHistory={contact.personIntelligence?.careerHistory || contact.commercialIntelligence?.careerHistory || []}
+                notableProjects={contact.personIntelligence?.notableProjects || contact.commercialIntelligence?.notableProjects || []}
+                summitsAndTalks={contact.personIntelligence?.summitsAndTalks || contact.commercialIntelligence?.summitsAndTalks || []}
+                publicationsAndArticles={contact.personIntelligence?.publicationsAndArticles || contact.commercialIntelligence?.publicationsAndArticles || []}
               />
 
               {/* Relationship & Network Door */}

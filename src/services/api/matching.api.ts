@@ -55,6 +55,42 @@ export interface SemanticProductMatchResponse {
   proposed_solution?: string;
 }
 
+export interface OttobonSolvableWay {
+  capability: string;
+  proposed_sprint: string;
+  delivery_risk: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  cost_pricing_estimate: string;
+  why_now?: string;
+}
+
+export interface NetworkSolverItem {
+  solver_contact_id: string;
+  solver_name: string;
+  solver_title: string;
+  solver_company: string;
+  solver_tier?: string;
+  match_strength: 'STRONG' | 'MODERATE' | string;
+  matched_capabilities: string[];
+  core_strengths: string[];
+  solver_reason: string;
+}
+
+export interface ProblemBoardItem {
+  contact_id: string;
+  contact_name: string;
+  contact_title: string;
+  contact_company: string;
+  contact_location?: string;
+  contact_tier: string;
+  linkedin_url?: string;
+  epistemic_status: 'EVIDENCE_GROUNDED' | 'SUPPORTED_INFERENCE' | 'HYPOTHESIS_ONLY' | string;
+  broad_business_problem: string;
+  smallest_solvable_problem?: string;
+  why_now?: string;
+  ottobon_solvable_way: OttobonSolvableWay;
+  network_solvers: NetworkSolverItem[];
+}
+
 export const matchingApi = {
   getMatchDetail: (id: string) => apiClient.get<NetworkMatchDetail>(`/api/network/matches/${id}`),
 
@@ -76,6 +112,10 @@ export const matchingApi = {
     apiClient.post<SemanticProductMatchResponse>('/api/v1/matching/semantic-product-match', {
       problem_text: problemText,
       ...metadata
-    })
+    }),
+
+  getProblemsBoard: () =>
+    apiClient.get<ProblemBoardItem[]>('/api/v1/matching/problems-board')
 };
+
 

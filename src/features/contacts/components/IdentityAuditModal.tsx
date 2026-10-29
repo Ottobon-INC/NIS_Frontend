@@ -1,18 +1,11 @@
 import React, { useState } from 'react';
 import {
   ShieldCheck,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
   RefreshCw,
   Copy,
   Check,
   X,
-  ExternalLink,
-  Search,
-  Activity,
-  Info,
-  Server
+  Activity
 } from 'lucide-react';
 import type { IdentityAuditData } from '../../../services/api/contacts.api';
 import { contactsApi } from '../../../services/api/contacts.api';
@@ -43,7 +36,6 @@ export const IdentityAuditModal: React.FC<IdentityAuditModalProps> = ({
   const score = auditData?.score ?? 0;
   const isConfirmed = score >= 80;
   const isProbable = score >= 60 && score < 80;
-  const isAmbiguous = score < 60;
 
   const scoreColor = isConfirmed ? '#059669' : isProbable ? '#2563EB' : '#D97706';
   const scoreBg = isConfirmed ? '#ECFDF5' : isProbable ? '#EFF6FF' : '#FFFBEB';

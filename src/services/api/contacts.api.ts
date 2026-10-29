@@ -112,6 +112,13 @@ export interface Contact360Data {
     background: string;
     expertise: string[];
     decisionInfluence: string;
+    domainKnowledge?: string;
+    whatTheyCanSolve?: string[];
+    coreStrengths?: string[];
+    careerHistory?: string[];
+    notableProjects?: string[];
+    summitsAndTalks?: string[];
+    publicationsAndArticles?: string[];
   };
   companyIntelligence: {
     industry: string;
@@ -193,6 +200,13 @@ export interface Contact360Data {
     }>;
     domainName: string;
     provenDomainExpertise: string;
+    domainKnowledge?: string;
+    whatTheyCanSolve?: string[];
+    coreStrengths?: string[];
+    careerHistory?: string[];
+    notableProjects?: string[];
+    summitsAndTalks?: string[];
+    publicationsAndArticles?: string[];
     isDomainSme: string;
     opportunityCategory: string;
     broadBusinessProblem: string;
