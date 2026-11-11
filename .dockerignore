@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.gitignore
+.env.local
+.oxlintrc.json
+docs
+NetworkOS_Clear_Individual_Wireframes
+README.md
+
