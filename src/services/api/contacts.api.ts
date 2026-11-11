@@ -1,4 +1,5 @@
 import { apiClient } from './core/client';
+import type { EvaluationBadge, EvalRunResponse } from './evals.api';
 
 export interface ContactOverview {
   id: string;
@@ -10,6 +11,7 @@ export interface ContactOverview {
   contact_type?: 'TARGET' | 'BHANU_CONNECTION' | string;
   card_status?: string;
   founder_reviewed?: boolean;
+  evaluation_badge?: EvaluationBadge | null;
 }
 
 export interface IdentifyData {
@@ -177,6 +179,7 @@ export interface Contact360Data {
   // Commercial Intelligence Fields
   full_markdown_report?: string;
   identityAudit?: IdentityAuditData;
+  aiEvaluation?: EvalRunResponse | null;
   epistemicVerification?: {
     identityStatus: string;
     identityConfidence: number;
@@ -430,6 +433,20 @@ export const contactsApi = {
     apiClient.post<{ success: boolean; contact_id: string }>(`/api/v1/contacts/${id}/decline`, {}),
 };
 
+export interface HiringRoleItem {
+  role_title: string;
+  citation_key?: string;
+  source_id?: string;
+  source_url?: string;
+  careers_url?: string;
+  exact_job_url?: string;
+  live_search_url?: string;
+  source_domain?: string;
+  verbatim_quote?: string;
+  grounding_score?: number;
+  is_verified?: boolean;
+}
+
 export interface CompanyIntelligenceData {
   id: string;
   contact_id?: string;
@@ -440,11 +457,29 @@ export interface CompanyIntelligenceData {
   what_they_implemented?: string;
   is_hiring: boolean;
   hiring_status: 'ACTIVELY_HIRING' | 'MODERATE' | 'LOW_OR_NONE' | 'UNKNOWN' | string;
-  hiring_roles?: string[];
+  hiring_roles?: Array<string | HiringRoleItem>;
   technologies_used?: string[];
   key_initiatives?: string[];
   summary_markdown?: string;
-  sources?: { title: string; url: string; snippet?: string }[];
+  sources?: Array<{
+    source_id?: string;
+    title: string;
+    url: string;
+    snippet?: string;
+    authority_tier?: string;
+    identity_status?: string;
+    is_eligible?: boolean;
+  }>;
+  grounding_score?: number;
+  verified_roles_count?: number;
+  total_roles_count?: number;
+  eval_summary?: {
+    accuracy_score: number;
+    citation_coverage: number;
+    grounded_claims: number;
+    total_claims: number;
+    verdict: string;
+  };
   created_at?: string;
   updated_at?: string;
 }

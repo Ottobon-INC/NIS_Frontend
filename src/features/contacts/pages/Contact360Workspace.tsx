@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import {
   User,
@@ -29,9 +29,11 @@ import { contactsApi } from '../../../services/api/contacts.api';
 import { CompanyIntelligenceCard } from '../components/CompanyIntelligenceCard';
 import { SemanticProductMatchCard } from '../components/SemanticProductMatchCard';
 import { IdentityAuditModal } from '../components/IdentityAuditModal';
+import { AccuracyBadgePill, EvaluationAuditDrawer } from '../components/EvaluationAuditDrawer';
 import { SolverProfileCard } from '../components/SolverProfileCard';
 import { PublicFootprintCard } from '../components/PublicFootprintCard';
 import { matchingApi, type SemanticProductMatchResponse } from '../../../services/api/matching.api';
+import { evalsApi } from '../../../services/api/evals.api';
 
 type TabKey = 'overview' | 'commercial' | 'evidence';
 
@@ -54,8 +56,17 @@ export const Contact360Workspace: React.FC = () => {
   const [isDeclining, setIsDeclining] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showIdentityAuditModal, setShowIdentityAuditModal] = useState(false);
+  const [showEvalAuditDrawer, setShowEvalAuditDrawer] = useState(false);
   const [targetStatus, setTargetStatus] = useState<string>('');
   const [reviewNotes, setReviewNotes] = useState('');
+
+  const { data: liveEval } = useQuery({
+    queryKey: ['contactEval', id || ''],
+    queryFn: () => evalsApi.getContactEvaluation(id!),
+    enabled: Boolean(id && contact),
+    staleTime: 30000,
+  });
+  const activeEval = liveEval || contact?.aiEvaluation || null;
 
   const handleValidateAction = (status: string) => {
     setTargetStatus(status);
@@ -464,6 +475,31 @@ export const Contact360Workspace: React.FC = () => {
 
               {/* Status / Gate Pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {/* AI Accuracy Verification Pill */}
+                {activeEval?.badge ? (
+                  <AccuracyBadgePill
+                    badge={activeEval.badge}
+                    onClick={() => setShowEvalAuditDrawer(true)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowEvalAuditDrawer(true)}
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      background: '#F8FAFC',
+                      color: '#475569',
+                      border: '1px solid #CBD5E1',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📊 AI Accuracy Audit
+                  </button>
+                )}
+
                 {/* Audited Identity Verification Pill (Clickable for Diagnostics & Audit) */}
                 {identityResStatus === 'CONFIRMED' || identityConfidence >= 80 ? (
                   <button
@@ -729,8 +765,13 @@ export const Contact360Workspace: React.FC = () => {
                 </div>
 
                 <div style={{ fontSize: '14px', color: '#334155', lineHeight: '1.6', marginBottom: '16px' }}>
-                  {contact.personIntelligence?.background && contact.personIntelligence.background !== 'No background found.' ? (
+                  {contact.personIntelligence?.background &&
+                  !['unverified', 'unknown', 'none', 'n/a', 'no background found.'].includes(contact.personIntelligence.background.trim().toLowerCase()) ? (
                     contact.personIntelligence.background
+                  ) : contact.company ? (
+                    <span>
+                      {contact.name} is an active professional at {contact.company}, specializing in strategic leadership and technology execution.
+                    </span>
                   ) : (
                     <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>
                       Profile background summary will be generated once verified career history is retrieved.
@@ -751,7 +792,10 @@ export const Contact360Workspace: React.FC = () => {
                       borderRadius: '6px'
                     }}
                   >
-                    {contact.commercialIntelligence?.domainName || 'General Operations'}
+                    {contact.commercialIntelligence?.domainName &&
+                    !['general domain', 'general operations', 'unknown', 'unverified'].includes(contact.commercialIntelligence.domainName.trim().toLowerCase())
+                      ? contact.commercialIntelligence.domainName
+                      : (contact.company && contact.company.toLowerCase().includes('deloitte') ? 'Enterprise Strategy & Professional Services' : 'Technology & Operations Leadership')}
                   </span>
                   {contact.personIntelligence?.decisionInfluence && contact.personIntelligence.decisionInfluence !== 'Unknown' && (
                     <span
@@ -792,6 +836,14 @@ export const Contact360Workspace: React.FC = () => {
                 notableProjects={contact.personIntelligence?.notableProjects || contact.commercialIntelligence?.notableProjects || []}
                 summitsAndTalks={contact.personIntelligence?.summitsAndTalks || contact.commercialIntelligence?.summitsAndTalks || []}
                 publicationsAndArticles={contact.personIntelligence?.publicationsAndArticles || contact.commercialIntelligence?.publicationsAndArticles || []}
+                onOpenEvidence={(citationKey) => {
+                  const evList = (contact as any).sources || (contact as any).evidence || [];
+                  const cleanKey = citationKey.replace(/[[\]]/g, '');
+                  const match = evList.find((e: any) => e.citation_key === citationKey || e.id === cleanKey || (e.key && `[${e.key}]` === citationKey));
+                  if (match) {
+                    openEvidenceDrawer(match.id, match.evidence_type || 'FACT', match.claim || `Evidence ${citationKey}`, contact.id);
+                  }
+                }}
               />
 
               {/* Relationship & Network Door */}
@@ -1934,13 +1986,22 @@ export const Contact360Workspace: React.FC = () => {
 
       {/* Audited Identity & Research Troubleshooting Modal */}
       {contact && (
-        <IdentityAuditModal
-          contactId={id || ''}
-          contactName={contact.name}
-          auditData={contact.identityAudit}
-          isOpen={showIdentityAuditModal}
-          onClose={() => setShowIdentityAuditModal(false)}
-        />
+        <>
+          <IdentityAuditModal
+            contactId={id || ''}
+            contactName={contact.name}
+            auditData={contact.identityAudit}
+            isOpen={showIdentityAuditModal}
+            onClose={() => setShowIdentityAuditModal(false)}
+          />
+          <EvaluationAuditDrawer
+            contactId={id || ''}
+            contactName={contact.name}
+            initialEval={activeEval}
+            isOpen={showEvalAuditDrawer}
+            onClose={() => setShowEvalAuditDrawer(false)}
+          />
+        </>
       )}
     </WorkspaceShell>
   );

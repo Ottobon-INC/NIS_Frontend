@@ -4,9 +4,11 @@ import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { WorkspaceShell } from '../../../components/layout/WorkspaceShell';
 import { useContacts } from '../../../hooks/useContacts';
 import { contactsApi } from '../../../services/api/contacts.api';
+import { evalsApi } from '../../../services/api/evals.api';
 import { getAuthToken } from '../../../services/api/core/client.ts';
 import { networkApi } from '../../../services/api/network.api';
 import { NetworkGraphCanvas } from '../../network/components/NetworkGraphCanvas';
+import { AccuracyBadgePill, EvaluationAuditDrawer } from '../components/EvaluationAuditDrawer';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -167,8 +169,34 @@ export const PeopleWorkspace: React.FC = () => {
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [actionToast, setActionToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [auditContact, setAuditContact] = useState<{ id: string; name: string } | null>(null);
+  const [isBatchEvaluating, setIsBatchEvaluating] = useState(false);
   const [viewMode, setViewMode] = useState<'accepted' | 'pending' | 'all' | 'graph'>('accepted');
   const [typeFilter, setTypeFilter] = useState<'all' | 'targets' | 'network'>('all');
+
+  const { data: evalSummary } = useQuery({
+    queryKey: ['evalSummary'],
+    queryFn: () => evalsApi.getSummary(),
+    staleTime: 30000,
+  });
+
+  const handleBatchEvaluate = async () => {
+    try {
+      setIsBatchEvaluating(true);
+      const res = await evalsApi.evaluateBatch(false);
+      await queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      await queryClient.invalidateQueries({ queryKey: ['evalSummary'] });
+      setActionToast({
+        message: `✓ AI Audited ${res.evaluated_count} profile(s). Workspace Average Accuracy: ${res.average_accuracy_score}%`,
+        type: 'success'
+      });
+      setTimeout(() => setActionToast(null), 5000);
+    } catch (e: any) {
+      alert(`Batch AI verification failed: ${e.message || 'Unknown error'}`);
+    } finally {
+      setIsBatchEvaluating(false);
+    }
+  };
 
   // Network graph view state
   const [graphSelectedNodeId, setGraphSelectedNodeId] = useState<string | null>(null);
@@ -363,7 +391,48 @@ export const PeopleWorkspace: React.FC = () => {
         isError={isError}
         isEmpty={false}
         headerActions={
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {evalSummary && evalSummary.total_evaluated_contacts > 0 ? (
+              <div
+                title={`Identity: ${evalSummary.average_identity_accuracy}% · Citations: ${evalSummary.average_citation_validity}% · Grounding: ${evalSummary.average_grounding_score}% · Faithfulness: ${evalSummary.average_faithfulness_score}%`}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #A7F3D0',
+                  background: '#ECFDF5',
+                  color: '#047857',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>✓ AI Accuracy Avg: {evalSummary.average_overall_accuracy}%</span>
+                <span style={{ fontSize: '11px', color: '#059669', fontWeight: 500 }}>
+                  ({evalSummary.total_evaluated_contacts} audited)
+                </span>
+              </div>
+            ) : null}
+            <button
+              onClick={handleBatchEvaluate}
+              disabled={isBatchEvaluating}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                background: '#fff',
+                color: '#334155',
+                fontWeight: 600,
+                fontSize: '12px',
+                cursor: isBatchEvaluating ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              {isBatchEvaluating ? 'Auditing…' : '🛡️ Verify AI Evals'}
+            </button>
             <button
               onClick={() => navigate('/network')}
               style={{
@@ -1158,6 +1227,38 @@ export const PeopleWorkspace: React.FC = () => {
                         🎯 Target
                       </span>
                     )}
+
+                    {/* AI Accuracy Badge */}
+                    {contact.evaluation_badge ? (
+                      <AccuracyBadgePill
+                        badge={contact.evaluation_badge}
+                        compact
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAuditContact({ id: contact.id, name: contact.name || 'Contact' });
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAuditContact({ id: contact.id, name: contact.name || 'Contact' });
+                        }}
+                        style={{
+                          fontSize: '11px',
+                          padding: '3px 7px',
+                          background: '#F8FAFC',
+                          color: '#64748B',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: 'var(--radius-sm)',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        📊 Audit AI %
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1267,6 +1368,13 @@ export const PeopleWorkspace: React.FC = () => {
           </>
         )}
       </WorkspaceShell>
+
+      <EvaluationAuditDrawer
+        contactId={auditContact?.id || ''}
+        contactName={auditContact?.name || ''}
+        isOpen={Boolean(auditContact)}
+        onClose={() => setAuditContact(null)}
+      />
     </>
   );
 };
