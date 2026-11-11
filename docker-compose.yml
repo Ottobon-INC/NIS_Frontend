@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_API_MODE: ${VITE_API_MODE:-real}
+        VITE_AUTH_TOKEN: ${VITE_AUTH_TOKEN:-Bearer mock-admin-token}
+    container_name: networkos-frontend
+    ports:
+      - "${FRONTEND_PORT:-8085}:80"
+    restart: unless-stopped
+    networks:
+      - networkos-net
+
+networks:
+  networkos-net:
+    name: networkos-net
+    driver: bridge
+
